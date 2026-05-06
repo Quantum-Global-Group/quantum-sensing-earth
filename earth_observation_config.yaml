@@ -1,0 +1,5 @@
+region:
+  name: Synthetic Central Valley groundwater demo
+  crs: EPSG:4326
+  grid_resolution_km: 5
+variables: [gravity_anomaly, groundwater_storage_change, soil_moisture, precipitation]

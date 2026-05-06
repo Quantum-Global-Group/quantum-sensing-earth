@@ -1,0 +1,21 @@
+dataset:
+  name: GRACE Tellus monthly land water-equivalent-thickness subset
+  source: https://grace.jpl.nasa.gov/data/get-data/monthly-mass-grids-land/
+  product: TELLUS_GRAC_L3_*_RL06_*_LND_v04 or specific downloaded product name
+  date_range: YYYY-MM
+  units: centimeters equivalent water thickness
+  crs: Fill from GeoTIFF/netCDF metadata
+  resolution: Fill from raster metadata, for example 1 degree or 0.5 degree grid
+  citation: Replace with exact JPL/PO.DAAC/NASA citation for the downloaded product.
+preprocessing:
+  notes: Describe crop, reprojection, scaling factors, gain factors, clipping, detrending, normalization, and nodata handling.
+mask:
+  method: Describe independent mask source or threshold method.
+  provenance: Independent masks are preferred. If threshold-derived from the same GRACE grid, say so clearly.
+  independent: false
+  weak_label_warning: Threshold masks derived from the validation grid are weak labels and are not independent ground truth.
+limitations:
+  - GRACE Tellus grids are coarse monthly mass anomaly products, not local gravity surveys.
+  - Equivalent water thickness is not the same unit as local mGal gravity anomaly.
+  - Threshold-derived masks are suitable for software validation only unless supported by independent evidence.
+  - Document product version, processing center, month, spatial crop, and any gain-factor decisions before interpreting results.

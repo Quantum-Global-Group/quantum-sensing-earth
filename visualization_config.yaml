@@ -1,0 +1,3 @@
+visualization:
+  output_dir: outputs/figures
+  maps: [ground_truth, classical_measurement, quantum_enhanced_measurement, anomaly_predictions]

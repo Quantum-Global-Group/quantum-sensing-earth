@@ -1,0 +1,11 @@
+algorithms:
+  z_score:
+    type: statistical_thresholding
+    threshold: 2.5
+  isolation_forest:
+    type: tree_based_unsupervised_anomaly_detection
+    contamination: 0.05
+  dbscan:
+    type: density_based_spatial_clustering
+    eps: 0.4
+    min_samples: 5

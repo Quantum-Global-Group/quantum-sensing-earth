@@ -1,0 +1,9 @@
+phases:
+  - name: scaffold
+    status: complete
+  - name: simulation
+    status: pending
+  - name: anomaly_detection
+    status: pending
+  - name: evaluation
+    status: pending

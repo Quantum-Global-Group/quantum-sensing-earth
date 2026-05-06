@@ -1,0 +1,11 @@
+{
+  "project_name": "quantum_sensing_earth_mvp",
+  "version": "0.1.0",
+  "domain": "quantum sensing, earth observation, climate intelligence",
+  "mvp_focus": "gravity anomaly detection for groundwater-style subsurface mass change",
+  "non_claims": [
+    "Does not prove quantum advantage",
+    "Does not validate hardware",
+    "Does not replace GRACE/GRACE-FO"
+  ]
+}

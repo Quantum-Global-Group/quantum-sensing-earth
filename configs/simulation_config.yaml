@@ -1,0 +1,14 @@
+simulation:
+  grid_size: [128, 128]
+  anomaly_count: 4
+  anomaly_intensity_range: [-1.0, -0.2]
+  anomaly_sigma_range: [4, 12]
+  random_seed: 42
+  batch_seeds: [42, 43, 44, 45, 46]
+  terrain_gradient: 0.01
+  background_std: 0.01
+  correlated_noise_radius: 1
+  anomaly_depth_range: [0.8, 1.4]
+  anomaly_size_scale: 1.0
+  density_contrast_range: [-1.2, -0.4]
+  sensor_altitude: 1.0

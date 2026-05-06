@@ -1,0 +1,4 @@
+commands:
+  setup: "python -m pip install -r requirements.txt"
+  run: "python -m src.main"
+  test: "pytest -q"

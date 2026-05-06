@@ -1,0 +1,9 @@
+agents:
+  research:
+    role: scientific_grounding
+  data_engineering:
+    role: pipelines
+  ml:
+    role: anomaly_detection
+  quantum_systems:
+    role: quantum_sensing

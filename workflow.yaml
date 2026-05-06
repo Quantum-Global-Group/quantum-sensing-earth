@@ -1,0 +1,9 @@
+workflow:
+  name: quantum_sensing_earth_mvp
+  steps:
+    - load_configs
+    - generate_synthetic_field
+    - apply_sensor_profiles
+    - run_anomaly_detection
+    - evaluate_results
+    - export_outputs

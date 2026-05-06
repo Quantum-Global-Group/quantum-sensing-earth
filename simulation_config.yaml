@@ -1,0 +1,6 @@
+simulation:
+  grid_size: [128, 128]
+  anomaly_count: 4
+  anomaly_intensity_range: [-1.0, -0.2]
+  anomaly_sigma_range: [4, 12]
+  random_seed: 42

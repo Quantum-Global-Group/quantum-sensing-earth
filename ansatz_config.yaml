@@ -1,0 +1,3 @@
+ansatz:
+  used_in_mvp: false
+  candidates: [RealAmplitudes, EfficientSU2]

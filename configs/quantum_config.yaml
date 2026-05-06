@@ -1,0 +1,4 @@
+quantum:
+  framing: quantum_sensing_inspired
+  hardware_required: false
+  sensor_type: quantum_gravity_gradiometer

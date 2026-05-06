@@ -1,0 +1,9 @@
+noise_models:
+  classical:
+    type: gaussian_additive
+    std_mgal: 0.08
+    drift_per_timestep_mgal: 0.02
+  quantum_enhanced:
+    type: gaussian_additive
+    std_mgal: 0.015
+    drift_per_timestep_mgal: 0.005

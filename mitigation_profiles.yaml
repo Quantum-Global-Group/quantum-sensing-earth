@@ -1,0 +1,7 @@
+mitigation_profiles:
+  none:
+    enabled: false
+  smoothing:
+    enabled: true
+  calibration_bias_correction:
+    enabled: true

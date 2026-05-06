@@ -1,0 +1,77 @@
+{
+  "type": "FeatureCollection",
+  "name": "western_us_demo_basins",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "basin_id": "central_valley",
+        "name": "California Central Valley",
+        "target_relevance": "groundwater_proxy",
+        "notes": "Approximate rectangular fixture for dashboard/science workflow validation; replace with authoritative basin boundaries before interpretation."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-122.5, 35.0], [-119.0, 35.0], [-119.0, 40.5], [-122.5, 40.5], [-122.5, 35.0]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "basin_id": "colorado_river",
+        "name": "Colorado River Basin",
+        "target_relevance": "basin_observation",
+        "notes": "Approximate western-U.S. basin fixture spanning the Colorado River system; not an official hydrologic unit boundary."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-114.8, 31.0], [-106.0, 31.0], [-106.0, 42.5], [-114.8, 42.5], [-114.8, 31.0]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "basin_id": "great_basin",
+        "name": "Great Basin",
+        "target_relevance": "basin_observation",
+        "notes": "Approximate interior-drainage fixture; use authoritative basin/HUC polygons for scientific analysis."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-120.5, 37.0], [-113.0, 37.0], [-113.0, 43.5], [-120.5, 43.5], [-120.5, 37.0]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "basin_id": "columbia_plateau",
+        "name": "Columbia Plateau",
+        "target_relevance": "basin_observation",
+        "notes": "Approximate Pacific Northwest hydrology fixture for basin aggregation workflow testing."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-124.5, 43.0], [-116.0, 43.0], [-116.0, 49.0], [-124.5, 49.0], [-124.5, 43.0]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "basin_id": "rio_grande",
+        "name": "Rio Grande Basin",
+        "target_relevance": "basin_observation",
+        "notes": "Approximate New Mexico/southern Colorado fixture; replace with official basin boundaries for publication-quality work."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-109.5, 31.0], [-103.0, 31.0], [-103.0, 38.5], [-109.5, 38.5], [-109.5, 31.0]]]
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantum-sensing-earth"
+version = "0.1.0"
+description = "Quantum-sensing-inspired gravity anomaly detection MVP for Earth observation experiments."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "pandas",
+  "scikit-learn",
+  "pyyaml",
+  "matplotlib",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+geo = ["rasterio", "pyshp", "netCDF4"]
+dashboard = ["streamlit", "plotly"]
+
+[project.scripts]
+quantum-sensing-earth = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src", "src.*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,4 @@
+feature_maps:
+  default:
+    name: gravity_grid_features
+    features: [x_coord, y_coord, gravity_value, local_gradient, temporal_delta]

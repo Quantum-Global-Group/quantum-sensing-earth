@@ -1,0 +1,45 @@
+# Local credentials and environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.token
+*.secret
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+build/
+dist/
+*.egg-info/
+
+# Downloaded or generated geospatial data
+/data/
+/outputs/
+*.zip
+*.nc
+*.tif
+*.tiff
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+
+# Keep source-controlled example fixtures/documentation.
+!examples/**/*.csv
+!examples/**/*.json
+!examples/**/*.geojson
+!examples/**/*.yaml
+
+# Local notebooks/checkpoints and OS files
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db

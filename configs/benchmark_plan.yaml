@@ -1,0 +1,5 @@
+benchmark:
+  primary_question: Does the quantum-enhanced sensor profile improve anomaly detection under controlled simulation?
+  profiles: [classical, quantum_enhanced]
+  metrics: [precision, recall, f1, rmse, snr, localization_error]
+  repeats: 5

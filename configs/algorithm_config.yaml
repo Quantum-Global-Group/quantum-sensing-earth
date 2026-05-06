@@ -1,0 +1,8 @@
+algorithms:
+  z_score:
+    threshold: 2.5
+  isolation_forest:
+    contamination: 0.05
+  dbscan:
+    eps: 0.4
+    min_samples: 5

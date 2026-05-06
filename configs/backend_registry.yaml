@@ -1,0 +1,8 @@
+backends:
+  local_simulator:
+    type: classical_python
+    enabled: true
+  qiskit_runtime:
+    enabled: false
+  cudaq:
+    enabled: false

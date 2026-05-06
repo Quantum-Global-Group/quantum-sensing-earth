@@ -1,0 +1,14 @@
+dataset:
+  name: Tiny validation fixture
+  source: Synthetic example bundled with the MVP
+  date_range: "2026-05-04"
+  units: mGal-like normalized anomaly units
+  citation: "Bundled demonstration fixture; not a scientific dataset."
+preprocessing:
+  notes: "No external preprocessing. Values are hand-authored for loader demonstration."
+mask:
+  provenance: "Hand-authored anomaly mask aligned to validation_grid.csv"
+  method: "Nonzero pixels represent the anomaly core."
+limitations:
+  - "Tiny fixture intended only to test validation plumbing."
+  - "Not suitable for scientific conclusions."

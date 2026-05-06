@@ -1,0 +1,4 @@
+model:
+  anomaly_detector:
+    default: z_score
+    available: [z_score, isolation_forest, dbscan]

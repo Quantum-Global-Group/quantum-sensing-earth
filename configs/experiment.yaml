@@ -1,0 +1,6 @@
+experiment:
+  id: qs-earth-demo-001
+  name: classical_vs_quantum_sensor_profile
+  seed: 42
+  profiles: [classical, quantum_enhanced]
+  detector: z_score

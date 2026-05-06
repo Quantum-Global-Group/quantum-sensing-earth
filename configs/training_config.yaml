@@ -1,0 +1,4 @@
+training:
+  supervised: false
+  approach: unsupervised_anomaly_detection
+  random_seed: 42

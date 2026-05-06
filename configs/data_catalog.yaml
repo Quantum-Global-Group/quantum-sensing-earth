@@ -1,0 +1,13 @@
+datasets:
+  synthetic_gravity:
+    type: synthetic
+    use: controlled benchmark
+  grace_fo:
+    type: satellite_gravity
+    source: nasa
+  smap:
+    type: soil_moisture
+    source: nasa
+  gldas:
+    type: land_surface_model
+    source: nasa

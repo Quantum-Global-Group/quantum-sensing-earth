@@ -1,0 +1,7 @@
+optimizers:
+  default:
+    name: COBYLA
+    maxiter: 100
+  classical_ml:
+    isolation_forest:
+      contamination: 0.05

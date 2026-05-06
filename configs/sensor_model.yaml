@@ -1,0 +1,13 @@
+sensors:
+  classical_gravimeter:
+    noise_std_mgal: 0.08
+    spatial_resolution_km: 10
+    drift_per_timestep_mgal: 0.02
+    resolution_blur_radius: 2
+    correlated_noise_radius: 1
+  quantum_gravity_gradiometer:
+    noise_std_mgal: 0.015
+    spatial_resolution_km: 3
+    drift_per_timestep_mgal: 0.005
+    resolution_blur_radius: 1
+    correlated_noise_radius: 0

@@ -1,0 +1,5 @@
+metrics:
+  classification: [precision, recall, f1]
+  reconstruction: [rmse]
+  signal: [snr]
+  spatial: [localization_error]
