@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+title: Quantum Sensing Earth
+message: If you use this research software, please cite it using this metadata.
+type: software
+authors:
+  - name: Quantum Global Group
+repository-code: https://github.com/Quantum-Global-Group/quantum-sensing-earth
+abstract: Reproducible GRACE/GRACE-FO hydrology validation dashboard with quantum-sensing-inspired detector comparisons.
+license: MIT
+version: 0.1.0
+date-released: 2026-05-06

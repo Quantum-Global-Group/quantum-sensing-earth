@@ -730,12 +730,12 @@ def title_block() -> None:
         """
         <div class="qse-title">
           <div class="qse-kicker">Technical validation dashboard</div>
-          <h1>Can gravity-derived water-mass signals align with independent drought and hydrology targets?</h1>
+          <h1>GRACE/GRACE-FO hydrology validation with detector comparison</h1>
           <p>
-            This dashboard reviews a GRACE-FO hydrology validation run against named western basins,
-            USDM drought masks, GLDAS terrestrial water storage, and GRACE processing-center agreement.
-            Quantum-inspired sensor simulation is kept as one comparison layer, while the main scientific
-            question is whether basin-scale water-mass signals are credible and repeatable.
+            This is a GRACE/GRACE-FO hydrology validation workflow with detector comparison, not a proven
+            quantum groundwater detector. The dashboard reviews whether water-mass rasters, drought labels,
+            GLDAS terrestrial water storage, and basin summaries produce repeatable evidence that a technical
+            reviewer can inspect.
           </p>
         </div>
         """,

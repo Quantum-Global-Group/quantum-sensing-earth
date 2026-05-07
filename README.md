@@ -1,8 +1,36 @@
-# Quantum Sensing Earth MVP
+# Quantum Sensing Earth
 
-A research-driven MVP for **quantum-sensing-inspired gravity anomaly detection** for Earth observation and climate intelligence.
+Reproducible **GRACE/GRACE-FO hydrology validation** with detector comparison and quantum-sensing-inspired sensor simulation.
 
-The MVP compares a classical gravimeter profile against a simulated quantum-enhanced gravity sensor profile to test whether improved measurement fidelity could improve detection of groundwater-like mass anomalies.
+This project asks a narrow, reviewable question: can gravity-derived water-mass rasters be processed into a transparent validation workflow and compared against independent drought and hydrology targets such as USDM, GLDAS/TWS, and basin summaries?
+
+What it currently proves:
+
+- The pipeline can run reproducibly from validation grids through sensor simulation, detector comparison, calibration, metrics, and reports.
+- Real or pseudo-real geospatial rasters can carry CRS, resolution, nodata, provenance, and mask metadata into review artifacts.
+- Detector outputs can be compared against independent drought proxies and external hydrology targets without hiding partial coverage or weak labels.
+
+What it does not prove:
+
+- It is not a proven quantum groundwater detector.
+- USDM and GLDAS are not direct groundwater truth.
+- Detector F1 against drought masks should not be presented as evidence of field-ready groundwater discovery.
+
+![Streamlit dashboard screenshot](docs/assets/dashboard_screenshot.png)
+
+## One-Command Demo
+
+Generate a download-free, reproducible review artifact from committed example fixtures:
+
+```bash
+python -m quantum_sensing_earth.demo --output outputs/demo
+```
+
+Then inspect the generated static report at `outputs/demo/report/report.html`. For the interactive Streamlit dashboard, use a multimonth output such as `outputs/gracefo_recent_usdm_6mo`:
+
+```bash
+python -m streamlit run src/dashboard/app.py -- --output outputs/gracefo_recent_usdm_6mo
+```
 
 ## Quick Start
 
@@ -97,6 +125,12 @@ python -m src.main make-grace-demo --output outputs/grace_demo --spatial-folds 4
 ```
 
 The demo command generates a mock GeoTIFF grid, weak-label mask, manifest, and full HTML report. It is intended for CI and onboarding, not scientific validation.
+
+For a base-dependency demo that does not require GeoTIFF support, use:
+
+```bash
+python -m quantum_sensing_earth.demo --output outputs/demo
+```
 
 Run a recent GRACE-FO + USDM validation batch:
 

@@ -15,8 +15,14 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .[dev]
+          python -m pip install -e .[dev,dashboard]
       - name: Test
         run: python -m pytest -q
       - name: Smoke run
         run: quantum-sensing-earth --seeds 1 --detectors z_score --output outputs/ci_smoke
+      - name: Dashboard import smoke
+        run: |
+          python -m py_compile src/dashboard/app.py
+          python -c "import src.dashboard.app"
+      - name: Download-free demo smoke
+        run: python -m quantum_sensing_earth.demo --output outputs/ci_demo --detectors z_score --spatial-folds 2
