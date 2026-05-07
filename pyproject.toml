@@ -22,7 +22,7 @@ geo = ["rasterio", "pyshp", "netCDF4"]
 dashboard = ["streamlit", "plotly"]
 
 [project.scripts]
-quantum-sensing-earth = "src.main:main"
+quantum-sensing-earth = "src.main:console_main"
 
 [tool.setuptools.packages.find]
 where = ["."]

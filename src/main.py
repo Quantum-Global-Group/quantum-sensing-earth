@@ -1417,5 +1417,10 @@ def main(argv=None):
     return run(args)
 
 
+def console_main(argv=None):
+    main(argv)
+    return 0
+
+
 if __name__ == "__main__":
     main()

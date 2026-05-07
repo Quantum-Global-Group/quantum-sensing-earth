@@ -6,6 +6,7 @@ from src.main import (
     best_parameter_rows,
     calibrate_detector_params,
     calibrated_z_threshold,
+    console_main,
     doctor_manifest,
     export_results_csv,
     fold_aggregate_rows,
@@ -47,6 +48,15 @@ def test_parse_seed_spec_accepts_count_list_and_range():
     assert parse_seed_spec("3", [42]) == [0, 1, 2]
     assert parse_seed_spec("42,44", [1]) == [42, 44]
     assert parse_seed_spec("42-44", [1]) == [42, 43, 44]
+
+
+def test_console_main_returns_success(monkeypatch, tmp_path):
+    project_root = Path(__file__).resolve().parents[1]
+    monkeypatch.chdir(project_root)
+
+    exit_code = console_main(["--seeds", "1", "--detectors", "z_score", "--output", str(tmp_path / "cli")])
+
+    assert exit_code == 0
 
 
 def test_summarize_rows_averages_metrics():
