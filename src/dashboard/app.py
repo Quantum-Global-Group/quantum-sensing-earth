@@ -637,6 +637,26 @@ def scientific_readiness(gldas_summary: dict[str, Any], groundwater_summary: dic
     return "Level 3", "Real raster plus independent drought proxy"
 
 
+def basin_callouts(basin_table: pd.DataFrame, groundwater_table: pd.DataFrame) -> tuple[str, str]:
+    if not groundwater_table.empty and "status" in groundwater_table and "grace_groundwater_correlation" in groundwater_table:
+        ok_rows = groundwater_table[groundwater_table["status"].eq("ok")]
+        if not ok_rows.empty:
+            best = ok_rows.sort_values("grace_groundwater_correlation", ascending=False, na_position="last").head(1).iloc[0]
+            weakest = ok_rows.sort_values("grace_groundwater_correlation", ascending=True, na_position="last").head(1).iloc[0]
+            return (
+                f"{best.get('basin_name', 'n/a')}: {fmt(best.get('grace_groundwater_correlation'))}",
+                f"{weakest.get('basin_name', 'n/a')}: {fmt(weakest.get('grace_groundwater_correlation'))}",
+            )
+    if not basin_table.empty and "grace_gldas_correlation" in basin_table:
+        best = basin_table.sort_values("grace_gldas_correlation", ascending=False, na_position="last").head(1).iloc[0]
+        weakest = basin_table.sort_values("grace_gldas_correlation", ascending=True, na_position="last").head(1).iloc[0]
+        return (
+            f"{best.get('basin_name', 'n/a')}: {fmt(best.get('grace_gldas_correlation'))}",
+            f"{weakest.get('basin_name', 'n/a')}: {fmt(weakest.get('grace_gldas_correlation'))}",
+        )
+    return "n/a", "n/a"
+
+
 def latest_month(df: pd.DataFrame) -> str | None:
     if df.empty or "month" not in df:
         return None
@@ -825,6 +845,8 @@ def validation_status(
     gldas_summary: dict[str, Any],
     tws_summary: dict[str, Any],
     groundwater_summary: dict[str, Any],
+    basin_summary_table: pd.DataFrame,
+    groundwater_summary_table: pd.DataFrame,
 ) -> None:
     level, level_note = scientific_readiness(gldas_summary, groundwater_summary)
     best = best_row(filtered)
@@ -836,12 +858,15 @@ def validation_status(
     weak_text = "n/a"
     if weak is not None:
         weak_text = f"{weak['month']} D{weak['threshold']}+, F1 {fmt(weak['f1'])}"
+    strongest_basin, weakest_basin = basin_callouts(basin_summary_table, groundwater_summary_table)
 
     metric_grid(
         [
             ("Validation status", level, level_note),
             ("Months tested", str(months), "GRACE/USDM monthly folds"),
             ("Targets", target_types(gldas_summary, tws_summary, groundwater_summary), "Mask, hydrology, and well evidence"),
+            ("Strongest basin", strongest_basin, "Groundwater first, GLDAS fallback"),
+            ("Weakest basin", weakest_basin, "Groundwater first, GLDAS fallback"),
             ("Strongest result", best_text, "Best visible detector row"),
             ("Weakest point", weak_text, "Low-performing z-score month"),
         ]
@@ -1672,7 +1697,15 @@ def main() -> None:
 
     stale_data_warning(timeline)
     coverage_warning(bundle)
-    validation_status(timeline, filtered, bundle["gldas_summary"], bundle["tws_summary"], bundle["groundwater_summary"])
+    validation_status(
+        timeline,
+        filtered,
+        bundle["gldas_summary"],
+        bundle["tws_summary"],
+        bundle["groundwater_summary"],
+        bundle["basin_summary_table"],
+        bundle["groundwater_summary_table"],
+    )
     coverage_overview(bundle)
     evidence_trail()
     study_region(output_dir, timeline, controls)

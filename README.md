@@ -28,6 +28,7 @@ What it does not prove:
 - [Data sources](docs/DATA_SOURCES.md)
 - [Scientific claims](docs/SCIENTIFIC_CLAIMS.md)
 - [Dashboard guide](docs/DASHBOARD_GUIDE.md)
+- [Release checklist](docs/RELEASE_CHECKLIST.md)
 
 ## One-Command Demo
 
@@ -156,8 +157,9 @@ Run the Central Valley groundwater-validation scaffold after preparing DWR Bulle
 
 ```bash
 python examples/central_valley/prepare_central_valley_basins.py
-python examples/grace_tellus/run_multimonth_usdm.py --mission grace-fo --study-region central-valley --start 2025-01-01 --months 6 --thresholds 1 2 3 --spatial-folds 4 --groundwater-observations path\to\dwr_periodic_groundwater_levels.csv --groundwater-source dwr-periodic --output outputs\central_valley_groundwater_001
-python -m streamlit run src/dashboard/app.py -- --output outputs/central_valley_groundwater_001
+python examples/central_valley/prepare_dwr_groundwater.py --input path\to\dwr_bulk.zip --basins data\central_valley\basins\central_valley_b118_basins.geojson --output data\central_valley\groundwater\dwr_groundwater_clean.csv --drop-unassigned
+python examples/grace_tellus/run_multimonth_usdm.py --mission grace-fo --study-region central-valley --months 12 --thresholds 1 2 3 --spatial-folds 4 --groundwater-observations data\central_valley\groundwater\dwr_groundwater_clean.csv --groundwater-source dwr-periodic --output outputs\central_valley_groundwater_release
+python -m streamlit run src/dashboard/app.py -- --output outputs/central_valley_groundwater_release
 ```
 
 This starts groundwater validation with basin wells. It still does not prove groundwater discovery or quantum advantage.

@@ -27,6 +27,14 @@ GROUNDWATER_SCHEMA_COLUMNS = [
     "quality_flag",
     "source_url",
 ]
+RAW_GROUNDWATER_COLUMNS = [
+    "raw_value",
+    "raw_value_column",
+    "raw_date",
+    "raw_measurement_type",
+    "raw_units",
+    "raw_source_file",
+]
 
 ALIASES = {
     "site_id": ["site_id", "site code", "site_code", "station_id", "station id", "well_id", "well id", "station"],
@@ -77,9 +85,12 @@ def column_lookup(columns: list[str]) -> dict[str, str]:
     return lookup
 
 
-def normalize_groundwater_observations(path: Path, source: str = "dwr-periodic") -> pd.DataFrame:
-    source_path = Path(path)
-    frame = pd.read_csv(source_path)
+def normalize_groundwater_dataframe(
+    frame: pd.DataFrame,
+    source: str = "dwr-periodic",
+    source_url: str | None = None,
+    source_file: str | None = None,
+) -> pd.DataFrame:
     lookup = column_lookup(list(frame.columns))
     rows: dict[str, Any] = {}
     for column in GROUNDWATER_SCHEMA_COLUMNS:
@@ -91,13 +102,29 @@ def normalize_groundwater_observations(path: Path, source: str = "dwr-periodic")
     normalized["value_units"] = normalized["value_units"].fillna("unknown")
     normalized["measurement_type"] = normalized["measurement_type"].fillna(infer_measurement_type(lookup.get("value", "")))
     normalized["quality_flag"] = normalized["quality_flag"].fillna("")
-    normalized["source_url"] = normalized["source_url"].fillna(str(source_path))
+    normalized["source_url"] = normalized["source_url"].fillna(source_url or source_file or "")
     normalized["date"] = pd.to_datetime(normalized["date"], errors="coerce")
     normalized["month"] = normalized["date"].map(normalize_month_key)
     normalized["value"] = pd.to_numeric(normalized["value"], errors="coerce")
     normalized["latitude"] = pd.to_numeric(normalized["latitude"], errors="coerce")
     normalized["longitude"] = pd.to_numeric(normalized["longitude"], errors="coerce")
-    return normalized[GROUNDWATER_SCHEMA_COLUMNS]
+    value_col = lookup.get("value")
+    date_col = lookup.get("date")
+    type_col = lookup.get("measurement_type")
+    units_col = lookup.get("value_units")
+    normalized["raw_value"] = frame[value_col] if value_col else None
+    normalized["raw_value_column"] = value_col or ""
+    normalized["raw_date"] = frame[date_col] if date_col else None
+    normalized["raw_measurement_type"] = frame[type_col] if type_col else normalized["measurement_type"]
+    normalized["raw_units"] = frame[units_col] if units_col else normalized["value_units"]
+    normalized["raw_source_file"] = source_file or source_url or ""
+    return normalized[GROUNDWATER_SCHEMA_COLUMNS + RAW_GROUNDWATER_COLUMNS]
+
+
+def normalize_groundwater_observations(path: Path, source: str = "dwr-periodic") -> pd.DataFrame:
+    source_path = Path(path)
+    frame = pd.read_csv(source_path)
+    return normalize_groundwater_dataframe(frame, source=source, source_url=str(source_path), source_file=str(source_path))
 
 
 def infer_measurement_type(value_column: str) -> str:

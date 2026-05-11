@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,10 +17,10 @@ from pathlib import Path
 import yaml
 
 
-B118_QUERY_URL = (
+B118_QUERY_URL = "https://gis.data.cnra.ca.gov/api/download/v1/items/49807a1fbc584631bdf88d9ca71dd083/geojson?layers=0"
+B118_ARCGIS_SERVICE = (
     "https://gis.water.ca.gov/arcgis/rest/services/Geoscientific/"
-    "i08_B118_CA_GroundwaterBasins/MapServer/0/query"
-    "?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&f=geojson"
+    "i08_B118_CA_GroundwaterBasins/FeatureServer/0"
 )
 
 CENTRAL_VALLEY_NAMES = (
@@ -50,8 +51,17 @@ def load_geojson(source: str) -> dict:
     path = Path(source)
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
-    with urllib.request.urlopen(source, timeout=90) as response:
-        return json.load(response)
+    request = urllib.request.Request(source, headers={"User-Agent": "quantum-sensing-earth/0.1"})
+    last_error = None
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                return json.load(response)
+        except Exception as exc:
+            last_error = exc
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
+    raise RuntimeError(f"Could not read DWR B118 GeoJSON from {source}: {last_error}") from last_error
 
 
 def feature_text(feature: dict) -> str:
@@ -98,6 +108,7 @@ def main() -> dict:
         "source": {
             "name": "California DWR Bulletin 118 Groundwater Basins",
             "url": args.source,
+            "arcgis_service": B118_ARCGIS_SERVICE,
             "download_date_utc": datetime.now(timezone.utc).isoformat(),
             "crs": "EPSG:4326",
             "license_or_terms_note": (

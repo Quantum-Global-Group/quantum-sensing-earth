@@ -981,9 +981,98 @@ def status_from_csv(path: Path, ok_statuses: set[str] | None = None) -> dict[str
     return status
 
 
+def write_executive_summary(
+    output_dir: Path,
+    coverage: dict | None,
+    gldas_summary: dict | None,
+    tws_summary: dict | None,
+    groundwater_summary: dict | None,
+) -> Path:
+    timeline = pd.read_csv(output_dir / "timeline_metrics.csv") if (output_dir / "timeline_metrics.csv").exists() else pd.DataFrame()
+    groundwater = (
+        pd.read_csv(output_dir / "groundwater_validation_summary.csv")
+        if (output_dir / "groundwater_validation_summary.csv").exists() and (output_dir / "groundwater_validation_summary.csv").stat().st_size > 0
+        else pd.DataFrame()
+    )
+    ok_timeline = timeline[timeline["status"].eq("ok")] if not timeline.empty and "status" in timeline else timeline
+    best_detector = None
+    weakest_detector = None
+    if not ok_timeline.empty:
+        scored = ok_timeline.copy()
+        scored["review_score"] = scored["f1"].fillna(0) + scored["iou"].fillna(0)
+        best_detector = scored.loc[scored["review_score"].idxmax()]
+        weakest_detector = scored.loc[scored["f1"].fillna(0).idxmin()]
+
+    ok_groundwater = groundwater[groundwater["status"].eq("ok")] if not groundwater.empty and "status" in groundwater else pd.DataFrame()
+    best_groundwater = None
+    if not ok_groundwater.empty and "grace_groundwater_correlation" in ok_groundwater:
+        best_groundwater = ok_groundwater.sort_values("grace_groundwater_correlation", ascending=False, na_position="last").head(1).iloc[0]
+
+    targets = (coverage or {}).get("targets", {})
+    coverage_lines = [f"- {target}: `{info.get('coverage', 'n/a')}`" for target, info in sorted(targets.items())]
+    groundwater_status = (groundwater_summary or {}).get("status", "not_configured")
+    lines = [
+        "# Executive Summary",
+        "",
+        "This run is a GRACE/GRACE-FO basin-scale hydrology and groundwater validation bundle. It is not evidence of a proven quantum groundwater detector or quantum advantage.",
+        "",
+        "## Validation Status",
+        "",
+        f"- Detector months: `{ok_timeline['month'].nunique() if not ok_timeline.empty and 'month' in ok_timeline else 0}`",
+        f"- GLDAS status: `{(gldas_summary or {}).get('status', 'missing')}`",
+        f"- TWS coverage: `{(tws_summary or {}).get('coverage', 'missing')}`",
+        f"- Groundwater status: `{groundwater_status}`",
+        "",
+        "## Coverage",
+        "",
+        *(coverage_lines or ["- No coverage summary was generated."]),
+        "",
+        "## Strongest Result",
+        "",
+    ]
+    if best_groundwater is not None:
+        lines.append(
+            f"- Best groundwater basin: `{best_groundwater.get('basin_name')}` with GRACE-groundwater correlation `{best_groundwater.get('grace_groundwater_correlation'):.3f}` over `{int(best_groundwater.get('valid_months', 0))}` valid months."
+        )
+    elif best_detector is not None:
+        lines.append(
+            f"- Best detector row: `{best_detector.get('algorithm')}` / `{best_detector.get('sensor_profile')}` / D{best_detector.get('threshold')}+ with F1 `{float(best_detector.get('f1')):.3f}`."
+        )
+    else:
+        lines.append("- No successful detector or groundwater rows were available.")
+    lines.extend(["", "## Weakest Result", ""])
+    if weakest_detector is not None:
+        lines.append(
+            f"- Weakest detector row: `{weakest_detector.get('month')}` D{weakest_detector.get('threshold')}+ `{weakest_detector.get('algorithm')}` with F1 `{float(weakest_detector.get('f1')):.3f}`."
+        )
+    else:
+        lines.append("- No detector weakness could be summarized.")
+    lines.extend(
+        [
+            "",
+            "## Scientific Caveats",
+            "",
+            "- USDM is an independent drought proxy, not groundwater truth.",
+            "- GLDAS/TWS are hydrology comparison targets, not direct well observations.",
+            "- Groundwater rows marked `insufficient_months` are not strong evidence.",
+            "- Quantum advantage is not claimed by this workflow.",
+            "",
+            "## Recommended Next Dataset",
+            "",
+            "Extend the Central Valley run with longer DWR/USGS well coverage or basin storage observations, then compare basin-level GRACE/GRACE-FO anomalies over at least 12 months.",
+            "",
+        ]
+    )
+    path = output_dir / "executive_summary.md"
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
 def write_batch_contract(
     output_dir: Path,
     run_rows: list[dict],
+    gldas_summary: dict | None = None,
+    tws_summary: dict | None = None,
     groundwater_summary: dict | None = None,
 ) -> dict:
     detection_months = {normalize_month_key(row["month"]) for row in run_rows if normalize_month_key(row["month"])}
@@ -994,11 +1083,13 @@ def write_batch_contract(
         "groundwater": status_from_csv(output_dir / "groundwater_basin_monthly.csv", ok_statuses={"ok"}),
     }
     coverage = write_coverage_artifacts(output_dir, detection_months, target_status)
+    write_executive_summary(output_dir, coverage, gldas_summary, tws_summary, groundwater_summary)
     required = {
         "timeline_metrics.csv",
         "coverage_summary.json",
         "month_alignment.csv",
         "timeline_report.html",
+        "executive_summary.md",
         "basin_metrics.csv",
         "basin_summary.json",
     }
@@ -1641,7 +1732,7 @@ def main() -> None:
         (output_dir / "groundwater_summary.json").write_text(json.dumps(groundwater_summary, indent=2), encoding="utf-8")
         (output_dir / "groundwater_validation_summary.json").write_text(json.dumps(groundwater_summary, indent=2), encoding="utf-8")
     csv_path, html_path = aggregate_timeline(output_dir, run_rows, tws_summary=tws_summary, gldas_summary=gldas_summary)
-    write_batch_contract(output_dir, run_rows, groundwater_summary=groundwater_summary)
+    write_batch_contract(output_dir, run_rows, gldas_summary=gldas_summary, tws_summary=tws_summary, groundwater_summary=groundwater_summary)
     print(f"Wrote {csv_path}")
     print(f"Wrote {html_path}")
 

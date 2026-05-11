@@ -24,16 +24,16 @@ The project has strong technical pieces, but it needs PM control, traceable arti
 
 ### Committed Work
 
-- [ ] Link `docs/WHAT_THIS_PROJECT_DOES.md` and `docs/FINISH_LINE_PLAN.md` from README.
-- [ ] Add `docs/PROJECT_MANAGEMENT_PLAN.md`.
-- [ ] Add `docs/SPRINT_PLAN.md`.
-- [ ] Add `docs/PRODUCT_BACKLOG.md`.
-- [ ] Add `docs/MILESTONES.md`.
-- [ ] Add `docs/RISK_AND_DEPENDENCY_REGISTER.md`.
-- [ ] Add `CHANGELOG.md`.
-- [ ] Add `artifact_manifest.json` generation for standard CLI runs.
-- [ ] Add test for artifact manifest generation.
-- [ ] Add release checklist section to docs.
+- [x] Link `docs/WHAT_THIS_PROJECT_DOES.md` and `docs/FINISH_LINE_PLAN.md` from README.
+- [x] Add `docs/PROJECT_MANAGEMENT_PLAN.md`.
+- [x] Add `docs/SPRINT_PLAN.md`.
+- [x] Add `docs/PRODUCT_BACKLOG.md`.
+- [x] Add `docs/MILESTONES.md`.
+- [x] Add `docs/RISK_AND_DEPENDENCY_REGISTER.md`.
+- [x] Add `CHANGELOG.md`.
+- [x] Add `artifact_manifest.json` generation for standard CLI runs.
+- [x] Add test for artifact manifest generation.
+- [x] Add release checklist section to docs.
 
 ### Acceptance Criteria
 
@@ -75,15 +75,15 @@ A reviewer should never think hydrology metrics cover all detector months if the
 
 ### Committed Work
 
-- [ ] Normalize month keys across GRACE, USDM, GLDAS, and TWS.
-- [ ] Add `coverage_summary.json`.
-- [ ] Add `month_alignment.csv`.
-- [ ] Add dashboard coverage timeline.
-- [ ] Add dashboard month-alignment table.
-- [ ] Add tests for missing GLDAS month.
-- [ ] Add tests for extra GLDAS/TWS month.
-- [ ] Add tests for inconsistent month formatting.
-- [ ] Add clearer warning text in reports and dashboard.
+- [x] Normalize month keys across GRACE, USDM, GLDAS, and TWS.
+- [x] Add `coverage_summary.json`.
+- [x] Add `month_alignment.csv`.
+- [x] Add dashboard coverage timeline.
+- [x] Add dashboard month-alignment table.
+- [x] Add tests for missing GLDAS month.
+- [x] Add tests for extra GLDAS/TWS month.
+- [x] Add tests for inconsistent month formatting.
+- [x] Add clearer warning text in reports and dashboard.
 
 ### Acceptance Criteria
 
@@ -159,14 +159,14 @@ GRACE/GRACE-FO is coarse. Basin-scale validation is more honest than pixel-level
 
 ### Committed Work
 
-- [ ] Select authoritative basin, aquifer, HUC, or groundwater-management boundary source.
-- [ ] Add data-source documentation and citation.
-- [ ] Add boundary conversion/rasterization workflow.
-- [ ] Add basin-source manifest fields.
+- [x] Select authoritative basin, aquifer, HUC, or groundwater-management boundary source.
+- [x] Add data-source documentation and citation.
+- [x] Add boundary conversion/rasterization workflow.
+- [x] Add basin-source manifest fields.
 - [ ] Add basin rasterization tests.
-- [ ] Add basin map with labels.
-- [ ] Add basin time-series panel.
-- [ ] Add strongest/weakest basin callouts.
+- [x] Add basin map with labels.
+- [x] Add basin time-series panel.
+- [x] Add strongest/weakest basin callouts.
 
 ### Acceptance Criteria
 
@@ -201,15 +201,16 @@ This is the key transition from workflow validation to groundwater-relevant vali
 
 ### Committed Work
 
-- [ ] Select first groundwater/storage target.
-- [ ] Document access, units, date range, citation, limitations.
-- [ ] Define observation CSV schema.
-- [ ] Add observation loader.
-- [ ] Add basin/month alignment.
-- [ ] Add groundwater/storage metrics.
-- [ ] Add dashboard groundwater/storage panel.
-- [ ] Add readiness badge upgrade logic.
-- [ ] Add tests for observation schema.
+- [x] Select first groundwater/storage target.
+- [x] Document access, units, date range, citation, limitations.
+- [x] Define observation CSV schema.
+- [x] Add observation loader.
+- [x] Add DWR groundwater prep command for bulk ZIP and station/measurement CSV inputs.
+- [x] Add basin/month alignment.
+- [x] Add groundwater/storage metrics.
+- [x] Add dashboard groundwater/storage panel.
+- [x] Add readiness badge upgrade logic.
+- [x] Add tests for observation schema.
 
 ### Acceptance Criteria
 
@@ -245,13 +246,13 @@ The final release must be readable, defensible, and hard to overclaim.
 ### Committed Work
 
 - [ ] Redesign dashboard information hierarchy.
-- [ ] Add executive summary export.
+- [x] Add executive summary export.
 - [ ] Add final reviewer verdict panel.
 - [ ] Add detector confusion overlays.
 - [ ] Add report bundle manifest.
-- [ ] Add `docs/SCIENTIFIC_CLAIMS.md`.
-- [ ] Add `docs/DATA_SOURCES.md`.
-- [ ] Add `docs/DASHBOARD_GUIDE.md`.
+- [x] Add `docs/SCIENTIFIC_CLAIMS.md`.
+- [x] Add `docs/DATA_SOURCES.md`.
+- [x] Add `docs/DASHBOARD_GUIDE.md`.
 - [ ] Run final 6-12 month validation.
 - [ ] Complete release checklist.
 - [ ] Tag first release.
@@ -273,4 +274,3 @@ Show:
 - final claim level;
 - release tag;
 - evidence bundle.
-

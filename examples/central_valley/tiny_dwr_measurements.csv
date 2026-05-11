@@ -1,0 +1,8 @@
+site_id,measurement_date,groundwater_elevation,value_units,quality_flag
+SAC-001,2025-01-15,42.0,ft,
+SAC-001,2025-02-15,41.4,ft,
+SAC-001,2025-03-15,40.8,ft,
+SJ-001,2025-01-15,68.0,ft,
+SJ-001,2025-02-15,69.5,ft,
+SJ-001,2025-03-15,71.0,ft,
+OUT-001,2025-01-15,10.0,ft,

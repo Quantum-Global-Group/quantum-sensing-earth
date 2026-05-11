@@ -28,33 +28,40 @@ This is the active finish-line task list. See [docs/FINISH_LINE_PLAN.md](docs/FI
 - [x] Add README, license, contribution guide, citation metadata, and screenshot
 - [x] Add comprehensive project explainer
 - [x] Add finish-line plan
+- [x] Add PM sprint/backlog/milestone docs
+- [x] Add artifact manifest generation
+- [x] Add month coverage summary and alignment artifacts
+- [x] Add Central Valley B118 basin prep scaffold
+- [x] Add groundwater observation loader, basin assignment, and metrics
+- [x] Add dashboard groundwater validation section
+- [x] Add release checklist
 
 ## Finish-Line Actions
 
 ### Data Credibility
 
-- [ ] Harden month matching across GRACE, USDM, GLDAS, and TWS.
-- [ ] Add hydrology coverage timeline and month-alignment table.
+- [x] Harden month matching across GRACE, USDM, GLDAS, and TWS.
+- [x] Add hydrology coverage timeline and month-alignment table.
 - [ ] Add robust GLDAS/TWS doctor checks.
 - [ ] Add formal manifest schema version.
 - [ ] Add importer tests for malformed GeoTIFF, NetCDF, nodata, missing CRS, and mismatched masks.
 
 ### Basin Validation
 
-- [ ] Replace basin fixture with authoritative basin, aquifer, HUC, or groundwater-management boundaries.
-- [ ] Record basin source, license, citation, and date.
+- [x] Replace basin fixture with authoritative basin, aquifer, HUC, or groundwater-management boundaries.
+- [x] Record basin source, license, citation, and date.
 - [ ] Add basin rasterization tests.
-- [ ] Add basin map with labels and overlays.
-- [ ] Add basin time-series dashboard panel.
+- [x] Add basin map with labels and overlays.
+- [x] Add basin time-series dashboard panel.
 
 ### Groundwater or Basin-Storage Validation
 
-- [ ] Choose one direct or near-direct validation target: wells, basin storage, aquifer observations, or groundwater study data.
-- [ ] Document source, access, units, date range, citation, limitations, and preprocessing.
-- [ ] Define observation CSV schema.
-- [ ] Add loader for observation data.
-- [ ] Add basin/month alignment to GRACE/GRACE-FO.
-- [ ] Add groundwater/storage dashboard panel.
+- [x] Choose one direct or near-direct validation target: wells, basin storage, aquifer observations, or groundwater study data.
+- [x] Document source, access, units, date range, citation, limitations, and preprocessing.
+- [x] Define observation CSV schema.
+- [x] Add loader for observation data.
+- [x] Add basin/month alignment to GRACE/GRACE-FO.
+- [x] Add groundwater/storage dashboard panel.
 
 ### Detector and Sensor Evidence
 
@@ -67,22 +74,22 @@ This is the active finish-line task list. See [docs/FINISH_LINE_PLAN.md](docs/FI
 ### Dashboard and Reports
 
 - [ ] Redesign dashboard visual hierarchy for reviewer-grade polish.
-- [ ] Add coverage timeline.
-- [ ] Add month-alignment table.
+- [x] Add coverage timeline.
+- [x] Add month-alignment table.
 - [ ] Add hydrology agreement panel.
 - [ ] Add detector confusion overlays with false-positive and false-negative explanations.
-- [ ] Add exportable executive summary.
-- [ ] Add `artifact_manifest.json` for every run.
+- [x] Add exportable executive summary.
+- [x] Add `artifact_manifest.json` for every run.
 - [ ] Add command replay script for each output folder.
 
 ### Release Readiness
 
-- [ ] Link finish-line docs from README.
-- [ ] Add `CHANGELOG.md`.
-- [ ] Add `docs/DATA_SOURCES.md`.
-- [ ] Add `docs/SCIENTIFIC_CLAIMS.md`.
-- [ ] Add `docs/DASHBOARD_GUIDE.md`.
-- [ ] Add release checklist and first version tag.
+- [x] Link finish-line docs from README.
+- [x] Add `CHANGELOG.md`.
+- [x] Add `docs/DATA_SOURCES.md`.
+- [x] Add `docs/SCIENTIFIC_CLAIMS.md`.
+- [x] Add `docs/DASHBOARD_GUIDE.md`.
+- [ ] Tag first version after final validation run.
 
 ## Final Release Gate
 

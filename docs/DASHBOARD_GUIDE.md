@@ -15,6 +15,7 @@ python -m streamlit run src/dashboard/app.py -- --output outputs/grace_multimont
 - `coverage_summary.json`
 - `month_alignment.csv`
 - `artifact_manifest.json`
+- `executive_summary.md`
 
 ## Optional Evidence Tracks
 

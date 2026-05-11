@@ -1,0 +1,4 @@
+site_id,site_name,latitude,longitude
+SAC-001,Sacramento Test Well,39.1,-121.8
+SJ-001,San Joaquin Test Well,36.4,-120.2
+OUT-001,Outside Test Well,34.0,-117.0

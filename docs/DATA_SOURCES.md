@@ -38,6 +38,7 @@ This project separates data-source credibility from detector performance. Every 
 - Preparation command: `python examples/central_valley/prepare_central_valley_basins.py`
 - Output: `data/central_valley/basins/central_valley_b118_basins.geojson`
 - Manifest: `data/central_valley/basins/central_valley_basin_manifest.yaml`
+- Access path: CA Open Data GeoJSON download, with the DWR ArcGIS FeatureServer recorded in the manifest.
 - Scientific caveat: basin boundaries define geography; they do not provide observations by themselves.
 
 ## Groundwater Observation Target
@@ -47,6 +48,7 @@ This project separates data-source credibility from detector performance. Every 
 - Role: primary v1 groundwater validation target.
 - Typical contents: well locations, measurement dates, groundwater depth/elevation values, quality information.
 - Validation use: wells are joined to DWR B118 basins, aggregated to monthly basin values, converted into basin groundwater-level anomalies, then compared against GRACE basin means.
+- Preparation command: `python examples/central_valley/prepare_dwr_groundwater.py --input path/to/dwr_bulk.zip --basins data/central_valley/basins/central_valley_b118_basins.geojson --output data/central_valley/groundwater/dwr_groundwater_clean.csv --drop-unassigned`
 - Minimum evidence rule: metrics with fewer than three valid basin/month pairs are marked `insufficient_months`.
 
 ## Supplemental Groundwater Target

@@ -15,9 +15,30 @@ The script reads the official California DWR Bulletin 118 ArcGIS GeoJSON service
 
 The manifest records source URL, download date, CRS, terms note, citation, filter method, and limitations.
 
-## Groundwater Observations
+## Prepare DWR Groundwater Observations
 
-The primary v1 target is California DWR Periodic Groundwater Level Measurements. Convert the DWR export into a CSV with either the canonical schema below or raw DWR-like columns that the importer can map:
+The primary v1 target is California DWR Periodic Groundwater Level Measurements. Normalize a DWR bulk ZIP, separate stations/measurements CSVs, or a combined canonical CSV:
+
+```bash
+python examples/central_valley/prepare_dwr_groundwater.py ^
+  --input path\to\dwr_bulk.zip ^
+  --basins data\central_valley\basins\central_valley_b118_basins.geojson ^
+  --output data\central_valley\groundwater\dwr_groundwater_clean.csv ^
+  --drop-unassigned
+```
+
+For separate station and measurement exports:
+
+```bash
+python examples/central_valley/prepare_dwr_groundwater.py ^
+  --stations path\to\stations.csv ^
+  --measurements path\to\measurements.csv ^
+  --basins data\central_valley\basins\central_valley_b118_basins.geojson ^
+  --output data\central_valley\groundwater\dwr_groundwater_clean.csv ^
+  --drop-unassigned
+```
+
+The output uses the canonical schema below and also preserves raw audit fields such as `raw_value`, `raw_value_column`, `raw_date`, `raw_measurement_type`, `raw_units`, and `raw_source_file`:
 
 - `site_id`
 - `site_name`
