@@ -79,7 +79,12 @@ def read_raster(path: str) -> dict[str, Any]:
 
 
 def maybe_csv(path: Path) -> pd.DataFrame:
-    return read_csv(str(path)) if path.exists() else pd.DataFrame()
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        return read_csv(str(path))
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
 
 
 def maybe_json(path: Path) -> dict[str, Any]:
@@ -548,13 +553,21 @@ def explainer(show: str, good: str, result: str, caution: str) -> None:
 def load_bundle(output_dir: Path) -> dict[str, Any]:
     return {
         "timeline": maybe_csv(output_dir / "timeline_metrics.csv"),
+        "month_alignment": maybe_csv(output_dir / "month_alignment.csv"),
+        "coverage_summary": maybe_json(output_dir / "coverage_summary.json"),
+        "artifact_manifest": maybe_json(output_dir / "artifact_manifest.json"),
         "gldas_metrics": maybe_csv(output_dir / "gldas_hydrology_metrics.csv"),
         "tws_metrics": maybe_csv(output_dir / "tws_comparison_metrics.csv"),
         "basin_metrics": maybe_csv(output_dir / "basin_metrics.csv"),
         "basin_summary_table": maybe_csv(output_dir / "basin_summary.csv"),
+        "groundwater_observations": maybe_csv(output_dir / "groundwater_observations.csv"),
+        "groundwater_monthly": maybe_csv(output_dir / "groundwater_basin_monthly.csv"),
+        "groundwater_metrics": maybe_csv(output_dir / "groundwater_validation_metrics.csv"),
+        "groundwater_summary_table": maybe_csv(output_dir / "groundwater_validation_summary.csv"),
         "gldas_summary": maybe_json(output_dir / "gldas_hydrology_summary.json"),
         "tws_summary": maybe_json(output_dir / "tws_comparison_summary.json"),
         "basin_summary": maybe_json(output_dir / "basin_summary.json"),
+        "groundwater_summary": maybe_json(output_dir / "groundwater_validation_summary.json") or maybe_json(output_dir / "groundwater_summary.json"),
     }
 
 
@@ -601,16 +614,24 @@ def weakest_row(df: pd.DataFrame) -> pd.Series | None:
     return candidates.loc[candidates["f1"].fillna(0).idxmin()]
 
 
-def target_types(gldas_summary: dict[str, Any], tws_summary: dict[str, Any]) -> str:
+def groundwater_ready(groundwater_summary: dict[str, Any]) -> bool:
+    return groundwater_summary.get("status") == "ok" and groundwater_summary.get("valid_basin_threshold_rows", 0) > 0
+
+
+def target_types(gldas_summary: dict[str, Any], tws_summary: dict[str, Any], groundwater_summary: dict[str, Any]) -> str:
     values = ["drought proxy"]
     if tws_summary.get("target_type"):
         values.append("GRACE TWS")
     if gldas_summary.get("status") == "ok":
         values.append("external hydrology")
+    if groundwater_summary.get("status") in {"ok", "insufficient_months"}:
+        values.append("groundwater wells")
     return " + ".join(values)
 
 
-def scientific_readiness(gldas_summary: dict[str, Any]) -> tuple[str, str]:
+def scientific_readiness(gldas_summary: dict[str, Any], groundwater_summary: dict[str, Any]) -> tuple[str, str]:
+    if groundwater_ready(groundwater_summary):
+        return "Level 5", "Groundwater/storage target present"
     if gldas_summary.get("status") == "ok":
         return "Level 4", "External hydrology target reached"
     return "Level 3", "Real raster plus independent drought proxy"
@@ -666,32 +687,65 @@ def coverage_warning(bundle: dict[str, Any]) -> None:
     detection_months = ok_months(timeline)
     gldas_months = ok_months(bundle["gldas_metrics"])
     tws_months = ok_months(bundle["tws_metrics"])
+    groundwater_months = ok_months(bundle["groundwater_monthly"])
     if not detection_months:
         return
     missing_gldas = sorted(detection_months - gldas_months)
     missing_tws = sorted(detection_months - tws_months)
-    if not missing_gldas and not missing_tws:
+    missing_groundwater = sorted(detection_months - groundwater_months)
+    groundwater_configured = bundle["groundwater_summary"].get("status") not in {None, "", "not_configured"}
+    if not missing_gldas and not missing_tws and (not groundwater_configured or not missing_groundwater):
         return
     gldas_coverage = bundle["gldas_summary"].get("coverage") or f"{len(gldas_months)}/{len(detection_months)}"
     tws_coverage = bundle["tws_summary"].get("coverage") or f"{len(tws_months)}/{len(detection_months)}"
+    groundwater_coverage = (
+        bundle["coverage_summary"].get("targets", {}).get("groundwater", {}).get("coverage")
+        or f"{len(groundwater_months)}/{len(detection_months)}"
+    )
     details = []
     if missing_gldas:
         details.append(f"GLDAS missing: {', '.join(missing_gldas)}")
     if missing_tws:
         details.append(f"TWS missing: {', '.join(missing_tws)}")
+    if groundwater_configured and missing_groundwater:
+        details.append(f"Groundwater missing: {', '.join(missing_groundwater)}")
     st.markdown(
         f"""
         <div class="qse-coverage-warning">
-          <b>Hydrology coverage is incomplete for this run.</b>
+          <b>Target coverage is incomplete for this run.</b>
           Detection months: <strong>{len(detection_months)}</strong>.
           GLDAS coverage: <strong>{html.escape(str(gldas_coverage))}</strong>.
           TWS coverage: <strong>{html.escape(str(tws_coverage))}</strong>.
+          Groundwater coverage: <strong>{html.escape(str(groundwater_coverage))}</strong>.
           {'; '.join(html.escape(item) for item in details)}.
-          Treat hydrology metrics as partial evidence until all detector months have matching hydrology targets.
+          Treat unmatched targets as partial evidence until detector, hydrology, and groundwater months align.
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+
+def coverage_overview(bundle: dict[str, Any]) -> None:
+    alignment = bundle["month_alignment"]
+    summary = bundle["coverage_summary"]
+    if alignment.empty and not summary:
+        return
+    st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
+    st.subheader("Month Coverage")
+    targets = summary.get("targets", {}) if summary else {}
+    cards = []
+    for target in ["grace", "usdm", "gldas", "tws", "basin", "groundwater"]:
+        info = targets.get(target, {})
+        cards.append((labelize(target), str(info.get("coverage", "n/a")), "month alignment"))
+    metric_grid(cards)
+    explainer(
+        "Which target datasets are present for each GRACE/GRACE-FO detector month.",
+        "Every validation target covers the same month keys before claims are summarized.",
+        "Missing months are shown explicitly and should be treated as partial evidence.",
+        "That a mean metric with partial coverage represents the full detector batch.",
+    )
+    if not alignment.empty:
+        st.dataframe(alignment, width="stretch", hide_index=True)
 
 
 def filter_controls(df: pd.DataFrame) -> dict[str, Any]:
@@ -734,7 +788,7 @@ def title_block() -> None:
           <p>
             This is a GRACE/GRACE-FO hydrology validation workflow with detector comparison, not a proven
             quantum groundwater detector. The dashboard reviews whether water-mass rasters, drought labels,
-            GLDAS terrestrial water storage, and basin summaries produce repeatable evidence that a technical
+            GLDAS terrestrial water storage, basin summaries, and groundwater wells produce repeatable evidence that a technical
             reviewer can inspect.
           </p>
         </div>
@@ -743,14 +797,15 @@ def title_block() -> None:
     )
 
 
-def readiness_ladder(gldas_summary: dict[str, Any]) -> None:
+def readiness_ladder(gldas_summary: dict[str, Any], groundwater_summary: dict[str, Any]) -> None:
     reached_gldas = gldas_summary.get("status") == "ok"
+    reached_groundwater = groundwater_ready(groundwater_summary)
     steps = [
         ("1. Synthetic", "Metrics and pipeline plumbing.", True, False),
         ("2. Real raster", "GRACE GeoTIFFs with metadata.", True, False),
-        ("3. Drought proxy", "Independent USDM masks.", True, not reached_gldas),
-        ("4. Hydrology target", "GLDAS/TWS comparison.", reached_gldas, reached_gldas),
-        ("5. Groundwater", "Needs wells or basin studies.", False, False),
+        ("3. Drought proxy", "Independent USDM masks.", True, not reached_gldas and not reached_groundwater),
+        ("4. Hydrology target", "GLDAS/TWS comparison.", reached_gldas, reached_gldas and not reached_groundwater),
+        ("5. Groundwater", "Basin wells/storage target.", reached_groundwater, reached_groundwater),
     ]
     chunks = ["<div class='qse-readiness'>"]
     for title, body, done, current in steps:
@@ -769,8 +824,9 @@ def validation_status(
     filtered: pd.DataFrame,
     gldas_summary: dict[str, Any],
     tws_summary: dict[str, Any],
+    groundwater_summary: dict[str, Any],
 ) -> None:
-    level, level_note = scientific_readiness(gldas_summary)
+    level, level_note = scientific_readiness(gldas_summary, groundwater_summary)
     best = best_row(filtered)
     weak = weakest_row(filtered)
     months = timeline["month"].nunique() if not timeline.empty else 0
@@ -785,7 +841,7 @@ def validation_status(
         [
             ("Validation status", level, level_note),
             ("Months tested", str(months), "GRACE/USDM monthly folds"),
-            ("Targets", target_types(gldas_summary, tws_summary), "Mask and hydrology evidence"),
+            ("Targets", target_types(gldas_summary, tws_summary, groundwater_summary), "Mask, hydrology, and well evidence"),
             ("Strongest result", best_text, "Best visible detector row"),
             ("Weakest point", weak_text, "Low-performing z-score month"),
         ]
@@ -800,10 +856,10 @@ def validation_status(
     with right:
         verdict(
             "Boundary of the claim",
-            "This does not prove groundwater discovery or quantum sensor superiority. USDM is a drought proxy, GLDAS is model-assimilated hydrology, and the next credible target is basin or groundwater observations.",
+            "Groundwater discovery is not proven and quantum advantage is not claimed. Even with DWR/USGS wells present, the evidence is basin-scale validation unless sensor sensitivity and field confirmation support stronger claims.",
             warning=True,
         )
-    readiness_ladder(gldas_summary)
+    readiness_ladder(gldas_summary, groundwater_summary)
 
 
 def evidence_trail() -> None:
@@ -815,7 +871,7 @@ def evidence_trail() -> None:
           <div class="qse-method-step"><b>1. GRACE raster</b><span>Monthly water-mass anomaly grids are cropped to a western U.S. study region.</span></div>
           <div class="qse-method-step"><b>2. Independent mask</b><span>USDM drought classes are rasterized onto the GRACE grid as D1+, D2+, and D3+ proxy labels.</span></div>
           <div class="qse-method-step"><b>3. Detector run</b><span>Classical and quantum-inspired sensor profiles feed z-score, DBSCAN, and isolation forest detectors.</span></div>
-          <div class="qse-method-step"><b>4. Hydrology check</b><span>GLDAS and JPL/CSR TWS comparisons ask whether basin-scale water storage moves consistently.</span></div>
+          <div class="qse-method-step"><b>4. Hydrology check</b><span>GLDAS, JPL/CSR TWS, and groundwater wells ask whether basin-scale water storage moves consistently.</span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1334,6 +1390,158 @@ def basin_validation(output_dir: Path, bundle: dict[str, Any]) -> None:
     )
 
 
+def groundwater_time_series(metrics: pd.DataFrame, monthly: pd.DataFrame, basin_id: str, threshold: int | None) -> Any | None:
+    if px is None or monthly.empty:
+        return None
+    basin_monthly = monthly[monthly["basin_id"].astype(str).eq(str(basin_id))].copy()
+    if basin_monthly.empty:
+        return None
+    columns = ["groundwater_monthly_mean", "groundwater_level_anomaly"]
+    long_df = basin_monthly.melt(id_vars=["month"], value_vars=columns, var_name="metric", value_name="value")
+    long_df["metric"] = long_df["metric"].map(
+        {
+            "groundwater_monthly_mean": "Groundwater raw monthly mean",
+            "groundwater_level_anomaly": "Groundwater anomaly",
+        }
+    )
+    fig = px.line(
+        long_df,
+        x="month",
+        y="value",
+        color="metric",
+        markers=True,
+        template="plotly_white",
+        color_discrete_sequence=[GREEN, BLUE],
+        labels={"month": "Month", "value": "Groundwater value", "metric": ""},
+    )
+    fig.update_layout(
+        title=f"Groundwater observation track for basin {basin_id}" + (f" | D{threshold}+" if threshold else ""),
+        height=410,
+        margin=dict(l=10, r=10, t=50, b=10),
+        legend_title_text="",
+    )
+    return fig
+
+
+def groundwater_lag_chart(summary_table: pd.DataFrame) -> Any | None:
+    if px is None or summary_table.empty:
+        return None
+    keep = [
+        "grace_groundwater_correlation",
+        "grace_groundwater_lag1_correlation",
+        "grace_groundwater_lag2_correlation",
+        "grace_groundwater_trend_agreement",
+        "grace_groundwater_sign_agreement",
+    ]
+    keep = [column for column in keep if column in summary_table.columns]
+    if not keep:
+        return None
+    chart_df = summary_table.copy()
+    chart_df["basin_label"] = chart_df["basin_name"].astype(str) + " D" + chart_df["threshold"].astype(str) + "+"
+    long_df = chart_df.melt(id_vars=["basin_label"], value_vars=keep, var_name="metric", value_name="value")
+    long_df["metric"] = long_df["metric"].map(labelize)
+    fig = px.bar(
+        long_df,
+        x="basin_label",
+        y="value",
+        color="metric",
+        barmode="group",
+        template="plotly_white",
+        color_discrete_sequence=[BLUE, GREEN, AMBER, RED, "#6b5fb5"],
+        labels={"basin_label": "Basin / threshold", "value": "Metric", "metric": ""},
+    )
+    fig.update_layout(height=470, margin=dict(l=10, r=10, t=25, b=100), legend_title_text="")
+    fig.update_xaxes(tickangle=35)
+    return fig
+
+
+def groundwater_validation(output_dir: Path, bundle: dict[str, Any]) -> None:
+    summary = bundle["groundwater_summary"]
+    observations = bundle["groundwater_observations"]
+    monthly = bundle["groundwater_monthly"]
+    metrics = bundle["groundwater_metrics"]
+    summary_table = bundle["groundwater_summary_table"]
+    st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
+    st.subheader("Groundwater Validation")
+    if not summary or summary.get("status") == "not_configured":
+        st.info("No groundwater observation track is configured for this run. Add DWR Periodic Groundwater Level Measurements or USGS groundwater observations to begin basin-scale groundwater validation.")
+        return
+
+    status = str(summary.get("status", "unknown"))
+    metric_grid(
+        [
+            ("Groundwater status", labelize(status), "DWR/USGS well target"),
+            ("Observation rows", str(summary.get("observation_rows", len(observations))), "well measurements"),
+            ("Basin-month rows", str(summary.get("basin_month_rows", len(monthly))), "aggregated observations"),
+            ("Valid basin rows", str(summary.get("valid_basin_threshold_rows", 0)), ">= 3 valid months"),
+            ("Insufficient rows", str(summary.get("insufficient_basin_threshold_rows", 0)), "not summarized as strong evidence"),
+        ]
+    )
+    if status == "ok":
+        verdict(
+            "Groundwater validation has begun",
+            "The dashboard found basin/month groundwater observations and computed GRACE-groundwater metrics. This advances the project beyond drought proxies, but it is still validation evidence rather than discovery proof.",
+        )
+    else:
+        verdict(
+            "Groundwater coverage warning",
+            "Groundwater observations are present, but at least one basin/threshold has fewer than three valid months. Those rows are marked insufficient_months and should not be used as strong evidence.",
+            warning=True,
+        )
+    verdict(
+        "Claim boundary",
+        "Groundwater discovery is not proven, and quantum advantage is not claimed. This section tests whether basin-scale GRACE/GRACE-FO anomalies move with well observations over time.",
+        warning=True,
+    )
+
+    if not summary_table.empty:
+        display_table = summary_table.copy()
+        strongest = display_table[display_table["status"].eq("ok")].sort_values("grace_groundwater_correlation", ascending=False, na_position="last").head(1)
+        weakest = display_table[display_table["status"].eq("ok")].sort_values("grace_groundwater_correlation", ascending=True, na_position="last").head(1)
+        cols = st.columns(2)
+        with cols[0]:
+            html_card(
+                "Strongest basin",
+                strongest["basin_name"].iloc[0] if not strongest.empty else "n/a",
+                f"corr {fmt(strongest['grace_groundwater_correlation'].iloc[0])}" if not strongest.empty else "Need >= 3 months",
+            )
+        with cols[1]:
+            html_card(
+                "Weakest basin",
+                weakest["basin_name"].iloc[0] if not weakest.empty else "n/a",
+                f"corr {fmt(weakest['grace_groundwater_correlation'].iloc[0])}" if not weakest.empty else "Need >= 3 months",
+            )
+
+    if not monthly.empty:
+        basin_options = sorted(monthly["basin_id"].dropna().astype(str).unique().tolist())
+        selected_basin = st.selectbox("Groundwater basin", basin_options, index=0)
+        threshold = None
+        if not metrics.empty and "threshold" in metrics:
+            threshold_options = sorted(metrics["threshold"].dropna().unique().tolist())
+            threshold = st.selectbox("Groundwater comparison threshold", threshold_options, index=0, format_func=lambda value: f"D{int(value)}+")
+        fig = groundwater_time_series(metrics, monthly, selected_basin, int(threshold) if threshold is not None else None)
+        if fig is not None:
+            st.plotly_chart(fig, width="stretch")
+
+    fig = groundwater_lag_chart(summary_table)
+    if fig is not None:
+        st.plotly_chart(fig, width="stretch")
+
+    explainer(
+        "Basin-level well observations aggregated to monthly groundwater anomalies and compared with GRACE basin means.",
+        "At least three valid months per basin plus stable correlation, trend agreement, and sign agreement.",
+        "Rows with too few months are labeled insufficient_months so they cannot silently inflate the claim.",
+        "That well agreement establishes site-level discovery or quantum sensor superiority.",
+    )
+    with st.expander("Groundwater tables", expanded=False):
+        st.markdown("**Groundwater validation summary**")
+        st.dataframe(summary_table, width="stretch", hide_index=True)
+        st.markdown("**Groundwater monthly basin observations**")
+        st.dataframe(monthly, width="stretch", hide_index=True)
+        st.markdown("**Groundwater observation rows**")
+        st.dataframe(observations, width="stretch", hide_index=True)
+
+
 def hydrology_targets(
     output_dir: Path,
     gldas_metrics: pd.DataFrame,
@@ -1394,8 +1602,8 @@ def limits_and_next_step(output_dir: Path, bundle: dict[str, Any]) -> None:
           <h3>Reviewer Verdict</h3>
           <dl>
             <dt>Workflow validation ready?</dt><dd><strong>Yes.</strong> The run is reproducible, artifact-backed, and compares real GRACE-derived rasters with independent drought and hydrology targets.</dd>
-            <dt>Groundwater claims ready?</dt><dd><strong>No.</strong> USDM and GLDAS are useful validation targets, but they are not direct groundwater truth.</dd>
-            <dt>Next required dataset</dt><dd>Basin storage observations, groundwater wells, or another independent groundwater/hydrology record aligned over multiple months.</dd>
+            <dt>Groundwater claims ready?</dt><dd><strong>No.</strong> Groundwater validation may be present, but discovery claims require stronger basin/well coverage, interpretation, and sensitivity analysis.</dd>
+            <dt>Next required dataset</dt><dd>Longer Central Valley basin well coverage, basin storage observations, or another independent groundwater record aligned over 6-12+ months.</dd>
           </dl>
         </div>
         """,
@@ -1405,13 +1613,13 @@ def limits_and_next_step(output_dir: Path, bundle: dict[str, Any]) -> None:
     with left:
         verdict(
             "Scientific caveat",
-            "The dashboard supports software validation and early hydrology comparison. It should not be presented as a proven detector for groundwater discovery until basin observations or groundwater wells are evaluated.",
+            "The dashboard supports software validation, hydrology comparison, and the beginning of basin-scale groundwater validation when wells are present. It should not be presented as a proven detector for groundwater discovery.",
             warning=True,
         )
     with right:
         verdict(
             "Recommended next experiment",
-            "Move from drought proxies to basin-scale groundwater or storage observations over more months. Keep the same artifact contract so the dashboard can compare USDM, GLDAS, TWS, and basin observations side by side.",
+            "Run the Central Valley workflow over 6-12 recent GRACE-FO months with DWR B118 basins and DWR periodic groundwater wells, then inspect which basins have enough independent observations.",
         )
 
     paths = [
@@ -1420,6 +1628,12 @@ def limits_and_next_step(output_dir: Path, bundle: dict[str, Any]) -> None:
         output_dir / "gldas_hydrology_summary.json",
         output_dir / "tws_comparison_metrics.csv",
         output_dir / "tws_comparison_summary.json",
+        output_dir / "coverage_summary.json",
+        output_dir / "month_alignment.csv",
+        output_dir / "groundwater_summary.json",
+        output_dir / "groundwater_validation_summary.json",
+        output_dir / "groundwater_validation_metrics.csv",
+        output_dir / "artifact_manifest.json",
         output_dir / "timeline_report.html",
     ]
     with st.expander("Artifacts and provenance", expanded=False):
@@ -1430,6 +1644,8 @@ def limits_and_next_step(output_dir: Path, bundle: dict[str, Any]) -> None:
         st.json(bundle["gldas_summary"] or {"status": "missing"})
         st.markdown("**TWS summary**")
         st.json(bundle["tws_summary"] or {"status": "missing"})
+        st.markdown("**Groundwater summary**")
+        st.json(bundle["groundwater_summary"] or {"status": "missing"})
 
 
 def main() -> None:
@@ -1456,10 +1672,12 @@ def main() -> None:
 
     stale_data_warning(timeline)
     coverage_warning(bundle)
-    validation_status(timeline, filtered, bundle["gldas_summary"], bundle["tws_summary"])
+    validation_status(timeline, filtered, bundle["gldas_summary"], bundle["tws_summary"], bundle["groundwater_summary"])
+    coverage_overview(bundle)
     evidence_trail()
     study_region(output_dir, timeline, controls)
     basin_validation(output_dir, bundle)
+    groundwater_validation(output_dir, bundle)
     hydrology_targets(
         output_dir,
         bundle["gldas_metrics"],

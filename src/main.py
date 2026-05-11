@@ -13,6 +13,7 @@ import numpy as np
 import yaml
 
 from src.data.generate_synthetic_gravity import generate_synthetic_gravity_field
+from src.data.artifacts import command_text, write_artifact_manifest
 from src.data.load_geospatial_data import load_validation_anomalies, load_validation_dataset
 from src.data.preprocess import preprocess_grid
 from src.models.anomaly_detector import detect_dbscan, detect_isolation_forest, detect_z_score
@@ -1088,6 +1089,20 @@ def write_output_bundle(results, output_dir):
     save_uncertainty_plot(results["summary"], output_dir / "metric_uncertainty.png")
     write_experiment_summary(results, output_dir / "experiment_summary.md")
     write_html_report(results, output_dir)
+    write_artifact_manifest(
+        output_dir,
+        producer_command=command_text(["python", "-m", "src.main"]),
+        required_for_dashboard={
+            "results.json",
+            "results.csv",
+            "summary.csv",
+            "best_params.csv",
+            "metadata.json",
+            "report.html",
+            "experiment_summary.md",
+        },
+        extra_metadata={"run_label": results.get("run_label"), "experiment_id": results.get("experiment_id")},
+    )
     return results
 
 

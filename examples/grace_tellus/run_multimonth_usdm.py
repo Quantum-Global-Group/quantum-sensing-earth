@@ -27,6 +27,14 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from src.data.artifacts import (
+    command_text,
+    normalize_month_key,
+    write_artifact_manifest,
+    write_coverage_artifacts,
+)
+from src.data.groundwater import write_groundwater_track
+
 
 CMR_GRANULES = "https://cmr.earthdata.nasa.gov/search/granules.json"
 CSR_COLLECTION = "C2077042515-POCLOUD"
@@ -39,6 +47,10 @@ JPL_GRACE_DOI = "https://doi.org/10.5067/TELND-3AJ64"
 GLDAS_SOURCE = "https://podaac.jpl.nasa.gov/dataset/TELLUS_GLDAS-NOAH-3.3_TWS-ANOMALY_MONTHLY"
 EARTHDATA_HOST = "urs.earthdata.nasa.gov"
 USDM_SHAPEFILE_TEMPLATE = "https://droughtmonitor.unl.edu/data/shapefiles_m/USDM_{date}_M.zip"
+WESTERN_US_BBOX = [-125.0, 31.0, -102.0, 49.0]
+CENTRAL_VALLEY_BBOX = [-123.5, 34.5, -118.5, 41.5]
+WESTERN_US_BASINS = Path("examples/grace_tellus/western_us_basins.geojson")
+CENTRAL_VALLEY_BASINS = Path("data/central_valley/basins/central_valley_b118_basins.geojson")
 
 
 def parse_args() -> argparse.Namespace:
@@ -52,15 +64,45 @@ def parse_args() -> argparse.Namespace:
         help="Use legacy GRACE collections or current GRACE-FO collections.",
     )
     parser.add_argument("--start", default="2025-01-01", help="CMR temporal search start date.")
-    parser.add_argument("--bbox", nargs=4, type=float, default=[-125, 31, -102, 49], metavar=("W", "S", "E", "N"))
+    parser.add_argument("--bbox", nargs=4, type=float, default=WESTERN_US_BBOX, metavar=("W", "S", "E", "N"))
+    parser.add_argument(
+        "--study-region",
+        choices=["western-us", "central-valley"],
+        default="western-us",
+        help="Named study region. central-valley uses the DWR B118 basin file when available.",
+    )
     parser.add_argument("--thresholds", nargs="+", type=int, default=[1, 2, 3], help="USDM DM thresholds, e.g. 1 2 3.")
     parser.add_argument("--spatial-folds", type=int, default=4)
     parser.add_argument("--detectors", nargs="+", default=["z_score", "dbscan", "isolation_forest"])
     parser.add_argument("--skip-existing", action="store_true", help="Do not rerun completed per-month reports.")
     parser.add_argument("--skip-tws-track", action="store_true", help="Do not add the CSR-vs-JPL GRACE-derived TWS comparison track.")
     parser.add_argument("--skip-gldas-track", action="store_true", help="Do not add the external GLDAS hydrology comparison track.")
-    parser.add_argument("--basins", default="examples/grace_tellus/western_us_basins.geojson", help="GeoJSON basin fixture used for basin-scale aggregation.")
+    parser.add_argument("--basins", help="GeoJSON basin/subbasin boundaries used for basin-scale aggregation.")
+    parser.add_argument("--groundwater-observations", help="DWR/USGS groundwater observation CSV to join and aggregate by basin.")
+    parser.add_argument(
+        "--groundwater-source",
+        default="dwr-periodic",
+        choices=["dwr-periodic", "usgs-groundwater", "fixture"],
+        help="Groundwater observation source label recorded in outputs.",
+    )
+    parser.add_argument("--skip-groundwater-track", action="store_true", help="Do not write groundwater observation validation artifacts.")
     return parser.parse_args()
+
+
+def configure_study_region(args: argparse.Namespace) -> tuple[list[float], Path, str]:
+    bbox = [float(value) for value in args.bbox]
+    if args.study_region == "central-valley":
+        if bbox == WESTERN_US_BBOX:
+            bbox = CENTRAL_VALLEY_BBOX
+        basins = Path(args.basins) if args.basins else CENTRAL_VALLEY_BASINS
+        if not basins.exists():
+            raise SystemExit(
+                "Central Valley runs require DWR B118 basin boundaries. "
+                "Run `python examples\\central_valley\\prepare_central_valley_basins.py` "
+                "or pass --basins path\\to\\central_valley_b118_basins.geojson."
+            )
+        return bbox, basins, "central_valley"
+    return bbox, Path(args.basins) if args.basins else WESTERN_US_BASINS, "western_us"
 
 
 def fetch_json(url: str) -> dict:
@@ -177,21 +219,30 @@ def download_usdm_near(iso_end: str, raw_dir: Path) -> tuple[str, Path, Path]:
     raise RuntimeError(f"Could not download a nearby USDM shapefile for {iso_end}: {last_error}")
 
 
-def manifest_for(granule: dict, usdm_date: str, usdm_zip: Path, threshold: int, output_grid: Path) -> dict:
+def manifest_for(
+    granule: dict,
+    usdm_date: str,
+    usdm_zip: Path,
+    threshold: int,
+    output_grid: Path,
+    bbox: list[float],
+    study_region: str,
+) -> dict:
     threshold_label = f"D{threshold}+"
-    bounds = "-125,31,-102,49"
+    bounds = ",".join(str(value) for value in bbox)
     mission = "GRACE-FO" if "GRFO" in granule.get("title", "") else "GRACE"
     product_short = "TELLUS_GRFO_L3_CSR_RL06.3_LND_v04" if mission == "GRACE-FO" else "TELLUS_GRAC_L3_CSR_RL06_LND_v04"
+    region_label = study_region.replace("_", " ")
     return {
         "dataset": {
-            "name": f"CSR {mission} Tellus cropped western CONUS with independent USDM {threshold_label} mask",
+            "name": f"CSR {mission} Tellus cropped {region_label} with independent USDM {threshold_label} mask",
             "source": granule["url"],
             "product": f"{product_short} / {granule['filename']}",
             "date_range": f"{mission} monthly solution: {granule['start']} to {granule['end']}; USDM weekly mask: {usdm_date}",
             "units": "centimeters equivalent water thickness",
             "crs": "EPSG:4326",
-            "resolution": "1 degree latitude/longitude grid; cropped to western CONUS bounds -125,31,-102,49",
-            "bounds": {"left": -125.0, "bottom": 31.0, "right": -102.0, "top": 49.0},
+            "resolution": f"1 degree latitude/longitude grid; cropped to {region_label} bounds {bounds}",
+            "bounds": {"left": bbox[0], "bottom": bbox[1], "right": bbox[2], "top": bbox[3]},
             "nodata": -99999.0,
             "citation": (
                 "Landerer F. 2021. TELLUS_GRAC_L3_CSR_RL06_LND_v04. Ver. RL06 v04. "
@@ -200,7 +251,7 @@ def manifest_for(granule: dict, usdm_date: str, usdm_zip: Path, threshold: int, 
             ),
         },
         "preprocessing": {
-            "notes": f"Band 1 was cropped to western CONUS bounds {bounds}. No reprojection, gain-factor rescaling, detrending, normalization, or clipping was applied.",
+            "notes": f"Band 1 was cropped to {region_label} bounds {bounds}. No reprojection, gain-factor rescaling, detrending, normalization, or clipping was applied.",
             "nodata": "Raster nodata value -99999.0 is retained and handled as missing data during validation.",
         },
         "mask": {
@@ -301,7 +352,7 @@ def trend_agreement(x_values: list[float], y_values: list[float]) -> float | Non
 
 def write_basin_track(output_dir: Path, run_rows: list[dict], basins_path: Path, bbox: list[float]) -> dict:
     basins = load_basin_features(basins_path)
-    months = sorted({row["month"] for row in run_rows})
+    months = sorted({normalize_month_key(row["month"]) for row in run_rows if normalize_month_key(row["month"])})
     gldas_by_month = {
         month: granule_for_month(GLDAS_COLLECTION, month, ".nc", public_only=False, require_exact=True)
         for month in months
@@ -390,7 +441,12 @@ def write_basin_track(output_dir: Path, run_rows: list[dict], basins_path: Path,
         "rows": len(rows),
         "metrics_csv": str(metrics_csv),
         "summary_csv": str(summary_csv),
-        "limitations": "Basin polygons are approximate fixtures for workflow validation. Replace with authoritative HUC/aquifer/basin boundaries before scientific interpretation.",
+        "limitations": (
+            "DWR Bulletin 118 basin/subbasin boundaries are authoritative for California groundwater basin geography, "
+            "but GRACE cells are coarse and groundwater observations still require coverage checks."
+            if "central_valley_b118" in basins_path.name.lower()
+            else "Basin polygons are approximate fixtures for workflow validation. Replace with authoritative HUC/aquifer/basin boundaries before scientific interpretation."
+        ),
     }
     (output_dir / "basin_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return summary
@@ -906,6 +962,65 @@ def stats(values: list[float]) -> dict:
     }
 
 
+def status_from_csv(path: Path, ok_statuses: set[str] | None = None) -> dict[str, str]:
+    ok_statuses = ok_statuses or {"ok"}
+    if not path.exists() or path.stat().st_size == 0:
+        return {}
+    try:
+        frame = pd.read_csv(path)
+    except pd.errors.EmptyDataError:
+        return {}
+    if frame.empty or "month" not in frame.columns:
+        return {}
+    if "status" not in frame.columns:
+        frame["status"] = "ok"
+    status = {}
+    for month, group in frame.groupby(frame["month"].map(normalize_month_key), dropna=True):
+        statuses = {str(value) for value in group["status"].dropna()}
+        status[month] = "ok" if statuses & ok_statuses else sorted(statuses)[0] if statuses else "missing"
+    return status
+
+
+def write_batch_contract(
+    output_dir: Path,
+    run_rows: list[dict],
+    groundwater_summary: dict | None = None,
+) -> dict:
+    detection_months = {normalize_month_key(row["month"]) for row in run_rows if normalize_month_key(row["month"])}
+    target_status = {
+        "gldas": status_from_csv(output_dir / "gldas_hydrology_metrics.csv"),
+        "tws": status_from_csv(output_dir / "tws_comparison_metrics.csv"),
+        "basin": status_from_csv(output_dir / "basin_metrics.csv", ok_statuses={"ok"}),
+        "groundwater": status_from_csv(output_dir / "groundwater_basin_monthly.csv", ok_statuses={"ok"}),
+    }
+    coverage = write_coverage_artifacts(output_dir, detection_months, target_status)
+    required = {
+        "timeline_metrics.csv",
+        "coverage_summary.json",
+        "month_alignment.csv",
+        "timeline_report.html",
+        "basin_metrics.csv",
+        "basin_summary.json",
+    }
+    if groundwater_summary and groundwater_summary.get("status") in {"ok", "insufficient_months"}:
+        required.update(
+            {
+                "groundwater_observations.csv",
+                "groundwater_basin_monthly.csv",
+                "groundwater_validation_metrics.csv",
+                "groundwater_validation_summary.json",
+                "groundwater_summary.json",
+            }
+        )
+    write_artifact_manifest(
+        output_dir,
+        producer_command=command_text(["python", "examples\\grace_tellus\\run_multimonth_usdm.py"]),
+        required_for_dashboard=required,
+        extra_metadata={"workflow": "grace_usdm_gldas_groundwater_multimonth"},
+    )
+    return coverage
+
+
 def write_timeline_plot(path: Path, rows: list[dict]) -> None:
     import matplotlib.pyplot as plt
 
@@ -1410,6 +1525,7 @@ def write_timeline_report(
 def main() -> None:
     args = parse_args()
     root = Path.cwd()
+    bbox, basins_path, region_slug = configure_study_region(args)
     output_dir = Path(args.output)
     raw_grace = Path("data/grace_tellus/raw")
     raw_usdm = Path("data/usdm/raw")
@@ -1429,11 +1545,11 @@ def main() -> None:
         tif_path = raw_grace / granule["filename"]
         download(granule["url"], tif_path)
         usdm_date, usdm_zip, usdm_shp = download_usdm_near(granule["end"], raw_usdm)
-        month = granule["start"][:7]
+        month = normalize_month_key(granule["start"])
         for threshold in args.thresholds:
             label = f"{month.replace('-', '')}_d{threshold}"
-            grid_path = prepared_dir / f"western_us_{mission_label}_{label}.tif"
-            mask_path = prepared_dir / f"western_us_usdm_{usdm_date}_d{threshold}plus_mask.tif"
+            grid_path = prepared_dir / f"{region_slug}_{mission_label}_{label}.tif"
+            mask_path = prepared_dir / f"{region_slug}_usdm_{usdm_date}_d{threshold}plus_mask.tif"
             manifest_path = prepared_dir / f"validation_manifest_{label}.yaml"
             run_dir = output_dir / f"{label}"
             run_rows.append(
@@ -1459,7 +1575,7 @@ def main() -> None:
                         "--vector",
                         str(usdm_shp),
                         "--bbox",
-                        *[str(value) for value in args.bbox],
+                        *[str(value) for value in bbox],
                         "--attribute",
                         "DM",
                         "--min-value",
@@ -1472,7 +1588,10 @@ def main() -> None:
                     ],
                     root,
                 )
-            manifest_path.write_text(yaml.safe_dump(manifest_for(granule, usdm_date, usdm_zip, threshold, grid_path), sort_keys=False), encoding="utf-8")
+            manifest_path.write_text(
+                yaml.safe_dump(manifest_for(granule, usdm_date, usdm_zip, threshold, grid_path, bbox, region_slug), sort_keys=False),
+                encoding="utf-8",
+            )
             run_command([sys.executable, "-m", "src.main", "doctor", "--manifest", str(manifest_path)], root)
             if args.skip_existing and (run_dir / "summary.csv").exists():
                 continue
@@ -1500,10 +1619,29 @@ def main() -> None:
                 root,
             )
 
-    tws_summary = None if args.skip_tws_track else write_tws_comparison_track(output_dir, granules, args.start, args.bbox, jpl_collection=jpl_collection)
-    gldas_summary = None if args.skip_gldas_track else write_gldas_track(output_dir, granules, args.start, args.bbox)
-    write_basin_track(output_dir, run_rows, Path(args.basins), args.bbox)
+    tws_summary = None if args.skip_tws_track else write_tws_comparison_track(output_dir, granules, args.start, bbox, jpl_collection=jpl_collection)
+    gldas_summary = None if args.skip_gldas_track else write_gldas_track(output_dir, granules, args.start, bbox)
+    write_basin_track(output_dir, run_rows, basins_path, bbox)
+    groundwater_summary = None
+    if args.groundwater_observations and not args.skip_groundwater_track:
+        groundwater_result = write_groundwater_track(
+            output_dir=output_dir,
+            observations_path=Path(args.groundwater_observations),
+            basins_path=basins_path,
+            basin_metrics_path=output_dir / "basin_metrics.csv",
+            source=args.groundwater_source,
+        )
+        groundwater_summary = groundwater_result.summary
+    elif not args.skip_groundwater_track:
+        groundwater_summary = {
+            "schema_version": "groundwater-validation-v1",
+            "status": "not_configured",
+            "claim_note": "Groundwater observations were not provided; groundwater validation has not begun for this run.",
+        }
+        (output_dir / "groundwater_summary.json").write_text(json.dumps(groundwater_summary, indent=2), encoding="utf-8")
+        (output_dir / "groundwater_validation_summary.json").write_text(json.dumps(groundwater_summary, indent=2), encoding="utf-8")
     csv_path, html_path = aggregate_timeline(output_dir, run_rows, tws_summary=tws_summary, gldas_summary=gldas_summary)
+    write_batch_contract(output_dir, run_rows, groundwater_summary=groundwater_summary)
     print(f"Wrote {csv_path}")
     print(f"Wrote {html_path}")
 

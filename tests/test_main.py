@@ -222,6 +222,7 @@ def test_run_exports_json_and_csv(monkeypatch, tmp_path):
     assert (tmp_path / "summary.csv").exists()
     assert (tmp_path / "best_params.csv").exists()
     assert (tmp_path / "metadata.json").exists()
+    assert (tmp_path / "artifact_manifest.json").exists()
     assert (tmp_path / "detection_quality_comparison.png").exists()
     assert (tmp_path / "experiment_summary.md").exists()
     assert (tmp_path / "report.html").exists()

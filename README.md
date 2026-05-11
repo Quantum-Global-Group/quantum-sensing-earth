@@ -18,6 +18,17 @@ What it does not prove:
 
 ![Streamlit dashboard screenshot](docs/assets/dashboard_screenshot.png)
 
+## Project Documents
+
+- [What this project does](docs/WHAT_THIS_PROJECT_DOES.md)
+- [Finish-line plan](docs/FINISH_LINE_PLAN.md)
+- [Sprint plan](docs/SPRINT_PLAN.md)
+- [Product backlog](docs/PRODUCT_BACKLOG.md)
+- [Project management plan](docs/PROJECT_MANAGEMENT_PLAN.md)
+- [Data sources](docs/DATA_SOURCES.md)
+- [Scientific claims](docs/SCIENTIFIC_CLAIMS.md)
+- [Dashboard guide](docs/DASHBOARD_GUIDE.md)
+
 ## One-Command Demo
 
 Generate a download-free, reproducible review artifact from committed example fixtures:
@@ -141,6 +152,16 @@ python -m streamlit run src/dashboard/app.py -- --output outputs/gracefo_recent_
 
 Older GRACE runs, such as the April 2002 demo, are useful for pipeline testing but should not be treated as present-day drought or groundwater evidence. The dashboard flags stale runs and recommends regenerating with current GRACE-FO collections.
 
+Run the Central Valley groundwater-validation scaffold after preparing DWR Bulletin 118 basin boundaries and a DWR groundwater observation CSV:
+
+```bash
+python examples/central_valley/prepare_central_valley_basins.py
+python examples/grace_tellus/run_multimonth_usdm.py --mission grace-fo --study-region central-valley --start 2025-01-01 --months 6 --thresholds 1 2 3 --spatial-folds 4 --groundwater-observations path\to\dwr_periodic_groundwater_levels.csv --groundwater-source dwr-periodic --output outputs\central_valley_groundwater_001
+python -m streamlit run src/dashboard/app.py -- --output outputs/central_valley_groundwater_001
+```
+
+This starts groundwater validation with basin wells. It still does not prove groundwater discovery or quantum advantage.
+
 The multimonth runner also writes basin-scale validation artifacts using `examples/grace_tellus/western_us_basins.geojson` by default:
 
 - `basin_metrics.csv`: per-basin, per-month GRACE mean, GLDAS mean, and USDM drought coverage
@@ -178,6 +199,7 @@ Each run writes:
 - `summary.csv`: mean, std, min, max, and 95% confidence intervals
 - `best_params.csv`: best parameter setting per sensor and detector, ranked by mean F1
 - `metadata.json`: CLI args, config snapshot, runtime info, timestamp, and package versions
+- `artifact_manifest.json`: every review artifact, producer command, timestamp, type, and dashboard-required flag
 - `experiment_summary.md`: short narrative summary
 - `*_overlay.png`: anomaly mask overlays for the first rendered seed
 - `detection_quality_comparison.png`: aggregate detector quality chart
@@ -196,6 +218,8 @@ python -m streamlit run src/dashboard/app.py -- --output outputs/grace_multimont
 ```
 
 The dashboard reads existing run artifacts such as `timeline_metrics.csv`, GLDAS/TWS summary JSON, GeoTIFF grid/mask paths, and generated PNG overlays. It provides a technical-review validation story with a first-screen credibility summary, an evidence trail, coordinate-aware study-region map, detector timelines, hydrology comparison charts, outcome thumbnails, and provenance links.
+
+For multimonth runs, the dashboard also reads `coverage_summary.json`, `month_alignment.csv`, `basin_metrics.csv`, and optional groundwater files: `groundwater_observations.csv`, `groundwater_basin_monthly.csv`, `groundwater_validation_metrics.csv`, `groundwater_validation_summary.json`, and `groundwater_summary.json`.
 
 ## Parameter Sweeps
 

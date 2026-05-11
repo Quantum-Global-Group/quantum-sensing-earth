@@ -1,0 +1,7 @@
+site_id,site_name,source,latitude,longitude,date,value,value_units,measurement_type,quality_flag,source_url
+SAC-001,Sacramento Test Well,fixture,39.1,-121.8,2025-01-15,42.0,ft,groundwater_elevation,,examples/central_valley/tiny_groundwater_observations.csv
+SAC-001,Sacramento Test Well,fixture,39.1,-121.8,2025-02-15,41.4,ft,groundwater_elevation,,examples/central_valley/tiny_groundwater_observations.csv
+SAC-001,Sacramento Test Well,fixture,39.1,-121.8,2025-03-15,40.8,ft,groundwater_elevation,,examples/central_valley/tiny_groundwater_observations.csv
+SJ-001,San Joaquin Test Well,fixture,36.4,-120.2,2025-01-15,68.0,ft,depth_to_water,,examples/central_valley/tiny_groundwater_observations.csv
+SJ-001,San Joaquin Test Well,fixture,36.4,-120.2,2025-02-15,69.5,ft,depth_to_water,,examples/central_valley/tiny_groundwater_observations.csv
+SJ-001,San Joaquin Test Well,fixture,36.4,-120.2,2025-03-15,71.0,ft,depth_to_water,,examples/central_valley/tiny_groundwater_observations.csv
