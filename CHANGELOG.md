@@ -7,6 +7,7 @@
 - Added Central Valley study-region support to the GRACE/USDM runner.
 - Added DWR Bulletin 118 basin preparation scaffold and download-free Central Valley fixtures.
 - Added DWR Periodic Groundwater Level Measurements preparation command for bulk ZIP, station/measurement CSVs, and canonical CSVs.
+- Added official DWR Periodic Groundwater Level Measurements discovery/download support through the CNRA CKAN API.
 - Added groundwater observation ingestion, basin assignment, monthly aggregation, and GRACE-groundwater metrics.
 - Added Streamlit dashboard groundwater validation and coverage sections.
 - Added final-run `executive_summary.md` export for multimonth validation bundles.

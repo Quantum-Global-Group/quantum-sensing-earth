@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import urllib.request
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +22,8 @@ from src.data.groundwater import (
 
 
 DWR_PERIODIC_SOURCE = "https://lab.data.ca.gov/dataset/periodic-groundwater-level-measurements"
+DWR_PERIODIC_CKAN_API = "https://data.cnra.ca.gov/api/3/action/package_show?id=periodic-groundwater-level-measurements"
+USER_AGENT = "quantum-sensing-earth/0.1 (+https://github.com/Quantum-Global-Group/quantum-sensing-earth)"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,10 +31,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--input", help="DWR bulk ZIP export or a single canonical/combined CSV.")
     parser.add_argument("--stations", help="DWR stations/wells CSV when measurements are supplied separately.")
     parser.add_argument("--measurements", help="DWR groundwater measurements CSV when stations are supplied separately.")
-    parser.add_argument("--basins", required=True, help="DWR B118 basin GeoJSON used for point-in-polygon assignment.")
+    parser.add_argument("--basins", help="DWR B118 basin GeoJSON used for point-in-polygon assignment.")
     parser.add_argument("--output", default="data/central_valley/groundwater/dwr_groundwater_clean.csv")
     parser.add_argument("--manifest", help="Output provenance manifest. Defaults to <output stem>_manifest.yaml.")
     parser.add_argument("--drop-unassigned", action="store_true", help="Drop observations outside the supplied basin polygons.")
+    parser.add_argument(
+        "--download-dwr-periodic",
+        action="store_true",
+        help="Discover and download official DWR Periodic Groundwater Level files before preparing observations.",
+    )
+    parser.add_argument("--download-dir", default="data/central_valley/groundwater/raw", help="Directory for downloaded DWR source files.")
+    parser.add_argument(
+        "--download-resource",
+        choices=["stations-measurements", "bulk-zip"],
+        default="stations-measurements",
+        help="Which official DWR resource set to download when --download-dwr-periodic is used.",
+    )
+    parser.add_argument("--download-only", action="store_true", help="Download official DWR files and stop before normalization.")
     return parser
 
 
@@ -40,6 +57,97 @@ def parse_args() -> argparse.Namespace:
 
 def read_csv(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
+
+
+def fetch_json(url: str) -> dict:
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def slug_resource_name(name: str, fmt: str) -> str:
+    stem = (
+        name.lower()
+        .replace("&", "and")
+        .replace("/", "_")
+        .replace("\\", "_")
+        .replace(" ", "_")
+        .replace("-", "_")
+    )
+    stem = "".join(char for char in stem if char.isalnum() or char == "_").strip("_")
+    suffix = fmt.lower().strip(".") or "dat"
+    return f"{stem}.{suffix}"
+
+
+def discover_dwr_resources(api_url: str = DWR_PERIODIC_CKAN_API) -> dict[str, dict]:
+    payload = fetch_json(api_url)
+    if not payload.get("success"):
+        raise RuntimeError(f"DWR CKAN API did not return success for {api_url}")
+    resources: dict[str, dict] = {}
+    for resource in payload.get("result", {}).get("resources", []):
+        name = str(resource.get("name") or "")
+        fmt = str(resource.get("format") or "")
+        url = str(resource.get("url") or "")
+        lower = name.lower()
+        if not url:
+            continue
+        if lower == "stations":
+            key = "stations"
+        elif lower == "measurements":
+            key = "measurements"
+        elif lower == "bulk data download":
+            key = "bulk_zip"
+        else:
+            continue
+        resources[key] = {"name": name, "format": fmt, "url": url, "filename": slug_resource_name(name, fmt)}
+    return resources
+
+
+def download_url(url: str, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=180) as response:
+        with destination.open("wb") as fh:
+            shutil.copyfileobj(response, fh)
+
+
+def download_dwr_periodic(download_dir: Path, resource_mode: str) -> tuple[dict[str, Path], dict]:
+    resources = discover_dwr_resources()
+    if resource_mode == "bulk-zip":
+        required = ["bulk_zip"]
+    else:
+        required = ["stations", "measurements"]
+    missing = [key for key in required if key not in resources]
+    if missing:
+        raise RuntimeError(f"Official DWR resources missing from CKAN response: {', '.join(missing)}")
+
+    downloaded: dict[str, Path] = {}
+    for key in required:
+        info = resources[key]
+        destination = download_dir / info["filename"]
+        if not destination.exists() or destination.stat().st_size == 0:
+            download_url(info["url"], destination)
+        downloaded[key] = destination
+    manifest = {
+        "schema_version": "dwr-periodic-download-v1",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "source": {
+            "name": "California DWR Periodic Groundwater Level Measurements",
+            "landing_page": DWR_PERIODIC_SOURCE,
+            "ckan_api": DWR_PERIODIC_CKAN_API,
+        },
+        "resource_mode": resource_mode,
+        "resources": {
+            key: {
+                "url": resources[key]["url"],
+                "path": str(path),
+                "bytes": int(path.stat().st_size) if path.exists() else 0,
+            }
+            for key, path in downloaded.items()
+        },
+    }
+    write_manifest(download_dir / "dwr_periodic_download_manifest.yaml", manifest)
+    return downloaded, manifest
 
 
 def zip_members(path: Path) -> list[str]:
@@ -83,6 +191,17 @@ def merge_station_measurements(stations: pd.DataFrame, measurements: pd.DataFram
 
 def load_input(args: argparse.Namespace) -> tuple[pd.DataFrame, dict]:
     metadata: dict = {"source_mode": None, "source_files": []}
+    if args.download_dwr_periodic:
+        downloaded, download_manifest = download_dwr_periodic(Path(args.download_dir), args.download_resource)
+        metadata["download_manifest"] = download_manifest
+        if args.download_only:
+            return pd.DataFrame(), metadata
+        if args.download_resource == "bulk-zip":
+            args.input = str(downloaded["bulk_zip"])
+        else:
+            args.stations = str(downloaded["stations"])
+            args.measurements = str(downloaded["measurements"])
+
     if args.stations and args.measurements:
         stations_path = Path(args.stations)
         measurements_path = Path(args.measurements)
@@ -119,6 +238,16 @@ def write_manifest(path: Path, payload: dict) -> None:
 def main(argv: list[str] | None = None) -> dict:
     args = parse_args() if argv is None else build_parser().parse_args(argv)
     raw, metadata = load_input(args)
+    if args.download_only:
+        result = {
+            "download_dir": str(Path(args.download_dir)),
+            "manifest": str(Path(args.download_dir) / "dwr_periodic_download_manifest.yaml"),
+            "resources": metadata.get("download_manifest", {}).get("resources", {}),
+        }
+        print(json.dumps(result, indent=2))
+        return result
+    if not args.basins:
+        raise SystemExit("Pass --basins unless using --download-only.")
     normalized = normalize_groundwater_dataframe(
         raw,
         source="dwr-periodic",
@@ -143,9 +272,11 @@ def main(argv: list[str] | None = None) -> dict:
         "source": {
             "name": "California DWR Periodic Groundwater Level Measurements",
             "url": DWR_PERIODIC_SOURCE,
+            "ckan_api": DWR_PERIODIC_CKAN_API,
             "mode": metadata.get("source_mode"),
             "files": metadata.get("source_files", []),
             "zip_members": metadata.get("zip_members", []),
+            "download_manifest": metadata.get("download_manifest"),
         },
         "basins": str(args.basins),
         "output": str(output),

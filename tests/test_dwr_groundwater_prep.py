@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
+import examples.central_valley.prepare_dwr_groundwater as dwr_prep
 from examples.central_valley.prepare_dwr_groundwater import main as prepare_dwr_groundwater
 
 
@@ -59,3 +60,48 @@ def test_prepare_dwr_groundwater_reads_zip_export(tmp_path):
     frame = pd.read_csv(output)
     assert len(frame) == 6
     assert set(frame["month"]) == {"2025-01", "2025-02", "2025-03"}
+
+
+def test_prepare_dwr_groundwater_download_only_uses_official_manifest(tmp_path, monkeypatch):
+    download_dir = tmp_path / "raw"
+
+    def fake_download_dwr_periodic(path, resource_mode):
+        path.mkdir(parents=True, exist_ok=True)
+        stations = path / "stations.csv"
+        measurements = path / "measurements.csv"
+        stations.write_text("site_id\nA\n", encoding="utf-8")
+        measurements.write_text("site_id,date,value\nA,2025-01-01,10\n", encoding="utf-8")
+        manifest = {
+            "resources": {
+                "stations": {"path": str(stations), "url": "https://data.cnra.ca.gov/stations.csv"},
+                "measurements": {"path": str(measurements), "url": "https://data.cnra.ca.gov/measurements.csv"},
+            }
+        }
+        return {"stations": stations, "measurements": measurements}, manifest
+
+    monkeypatch.setattr(dwr_prep, "download_dwr_periodic", fake_download_dwr_periodic)
+    result = prepare_dwr_groundwater(["--download-dwr-periodic", "--download-only", "--download-dir", str(download_dir)])
+
+    assert result["download_dir"] == str(download_dir)
+    assert "stations" in result["resources"]
+    assert "measurements" in result["resources"]
+
+
+def test_discover_dwr_resources_extracts_expected_ckan_entries(monkeypatch):
+    payload = {
+        "success": True,
+        "result": {
+            "resources": [
+                {"name": "Stations", "format": "CSV", "url": "https://example.test/stations.csv"},
+                {"name": "Measurements", "format": "CSV", "url": "https://example.test/measurements.csv"},
+                {"name": "Bulk Data Download", "format": "ZIP", "url": "https://example.test/bulk.zip"},
+                {"name": "Change Log", "format": "TXT", "url": "https://example.test/changelog.txt"},
+            ]
+        },
+    }
+
+    monkeypatch.setattr(dwr_prep, "fetch_json", lambda _url: payload)
+    resources = dwr_prep.discover_dwr_resources()
+
+    assert set(resources) == {"stations", "measurements", "bulk_zip"}
+    assert resources["bulk_zip"]["filename"] == "bulk_data_download.zip"
