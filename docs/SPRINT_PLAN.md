@@ -6,6 +6,19 @@ Sprint length: 2 weeks.
 
 Planning assumption: one small team or one agentic development lane. If more engineers join, split each sprint into parallel data, dashboard, and QA tracks.
 
+## Current Release Snapshot
+
+As of 2026-05-12, the project has moved from scaffold work into release validation:
+
+- Live DWR Bulletin 118 Central Valley basin prep has been run locally and produced 35 basin/subbasin features.
+- Official DWR Periodic Groundwater Level Measurements station and measurement CSVs have been downloaded locally.
+- DWR observations have been normalized into `data/central_valley/groundwater/dwr_groundwater_clean.csv` with 221,192 rows, 17 months, and 35 basins.
+- A six-month GRACE-FO Central Valley evidence bundle exists at `outputs/central_valley_groundwater_release`.
+- That bundle reports 6/6 coverage for GRACE, USDM, GLDAS, TWS, basin, and groundwater targets.
+- Local tests, demo smoke, Streamlit smoke, and GitHub CI have passed for the latest P0 checkpoint.
+
+The remaining release focus is no longer basic capability. It is final review quality: claim consistency, dashboard visual review, twelve-month preferred run if coverage allows, and release tagging.
+
 ## Sprint 1: Project Control and Data Credibility Baseline
 
 ### Sprint Goal
@@ -126,6 +139,8 @@ USDM is only a drought proxy. GLDAS/TWS is closer to terrestrial water storage a
 - [ ] Add bad-variable-name test.
 - [ ] Add missing-units warning.
 - [ ] Update GRACE Tellus README with GLDAS/TWS steps.
+- [x] Confirm GLDAS/TWS are month-aligned in the six-month Central Valley release bundle.
+- [x] Show GLDAS/TWS target coverage in `coverage_summary.json`, `month_alignment.csv`, and the dashboard.
 
 ### Acceptance Criteria
 
@@ -167,6 +182,9 @@ GRACE/GRACE-FO is coarse. Basin-scale validation is more honest than pixel-level
 - [x] Add basin map with labels.
 - [x] Add basin time-series panel.
 - [x] Add strongest/weakest basin callouts.
+- [x] Run live DWR Bulletin 118 Central Valley basin prep locally.
+- [x] Produce `data/central_valley/basins/central_valley_b118_basins.geojson`.
+- [x] Produce `data/central_valley/basins/central_valley_basin_manifest.yaml`.
 
 ### Acceptance Criteria
 
@@ -206,15 +224,21 @@ This is the key transition from workflow validation to groundwater-relevant vali
 - [x] Define observation CSV schema.
 - [x] Add observation loader.
 - [x] Add DWR groundwater prep command for bulk ZIP and station/measurement CSV inputs.
+- [x] Add official DWR Stations and Measurements discovery/download support.
+- [x] Add chunked month-window filtering for large DWR measurement CSVs.
+- [x] Normalize DWR `gwe` as groundwater elevation in feet.
+- [x] Preserve raw value/date/source audit fields.
+- [x] Restrict existing groundwater basin codes to the supplied B118 basin file.
 - [x] Add basin/month alignment.
 - [x] Add groundwater/storage metrics.
 - [x] Add dashboard groundwater/storage panel.
 - [x] Add readiness badge upgrade logic.
 - [x] Add tests for observation schema.
+- [x] Generate local DWR clean groundwater CSV for Central Valley release validation.
 
 ### Acceptance Criteria
 
-- At least one basin has multimonth groundwater/storage observations.
+- At least one basin has multimonth groundwater/storage observations. Current local result: 35 basins across 17 DWR months.
 - Dashboard distinguishes groundwater/storage validation from drought and GLDAS validation.
 - Project can truthfully say it has begun groundwater or basin-storage validation.
 
@@ -249,11 +273,14 @@ The final release must be readable, defensible, and hard to overclaim.
 - [x] Add executive summary export.
 - [x] Add final reviewer verdict panel.
 - [ ] Add detector confusion overlays.
-- [ ] Add report bundle manifest.
+- [x] Add report bundle manifest.
 - [x] Add `docs/SCIENTIFIC_CLAIMS.md`.
 - [x] Add `docs/DATA_SOURCES.md`.
 - [x] Add `docs/DASHBOARD_GUIDE.md`.
-- [ ] Run final 6-12 month validation.
+- [x] Run minimum six-month Central Valley validation.
+- [ ] Run preferred twelve-month Central Valley validation if coverage allows.
+- [ ] Complete final dashboard visual review.
+- [ ] Confirm README, dashboard, docs, and executive summary agree on claim level.
 - [ ] Complete release checklist.
 - [ ] Tag first release.
 
@@ -274,3 +301,49 @@ Show:
 - final claim level;
 - release tag;
 - evidence bundle.
+
+## Sprint 7: Release Closure
+
+### Sprint Goal
+
+Turn the completed six-month Central Valley evidence path into a first tagged release.
+
+### Why This Sprint Matters
+
+Most P0 capability now exists. The release should only be tagged after a reviewer can open the dashboard, understand the claim boundary immediately, and reproduce the release path without hidden local assumptions.
+
+### User Stories
+
+- As a reviewer, I want the dashboard, README, docs, and executive summary to say the same thing about what is and is not proven.
+- As a release owner, I want the final output folder to pass artifact, coverage, and dashboard checks.
+- As a scientist, I want the strongest groundwater result to be presented with sample-size and caveat context.
+
+### Committed Work
+
+- [ ] Run the preferred twelve-month GRACE-FO Central Valley validation, or document why six months is the release scope.
+- [ ] Review the Streamlit dashboard visually against `outputs/central_valley_groundwater_release`.
+- [ ] Confirm the first screen shows validation status, readiness ladder, month coverage, strongest/weakest basin, and claim boundary.
+- [ ] Confirm the groundwater section shows basin selector, GRACE-vs-groundwater time series, lag/correlation panel, and observation coverage warnings.
+- [ ] Confirm detector visuals stay secondary to hydrology and groundwater validation.
+- [ ] Update release notes with validated/not-validated language.
+- [ ] Complete `docs/RELEASE_CHECKLIST.md`.
+- [ ] Tag the first release after CI is green.
+
+### Acceptance Criteria
+
+- `python -m pytest -q` passes.
+- `python -m quantum_sensing_earth.demo --output outputs/demo` passes.
+- GitHub Actions passes.
+- Final Central Valley dashboard opens locally.
+- No `data/`, `outputs/`, credentials, or tokens are committed.
+- Release tag is created only after the claim-level review is complete.
+
+### Demo
+
+Show:
+
+- final Central Valley dashboard;
+- `coverage_summary.json` with target coverage;
+- `executive_summary.md`;
+- completed release checklist;
+- release tag.

@@ -40,7 +40,7 @@
 | QSE-014 | Docs | Update GLDAS/TWS manual workflow | P1 | Todo | Sprint 3 | README or data-source docs include exact steps |
 | QSE-015 | Basin | Select authoritative basin boundary source | P0 | Done | Sprint 4 | Decision documented with citation and license |
 | QSE-016 | Basin | Add basin conversion/rasterization workflow | P0 | Done | Sprint 4 | Boundaries align to GRACE grid |
-| QSE-017 | Basin | Add basin rasterization tests | P0 | Todo | Sprint 4 | Generated or fixture polygons rasterize correctly |
+| QSE-017 | Basin | Add basin rasterization tests | P1 | Todo | Sprint 4 | Generated or fixture polygons rasterize correctly |
 | QSE-018 | Dashboard | Add basin map and labels | P0 | Done | Sprint 4 | Dashboard displays named basin boundaries |
 | QSE-019 | Dashboard | Add basin time-series panel | P1 | Done | Sprint 4 | GRACE/GLDAS/USDM shown by basin/month |
 | QSE-020 | Science | Select groundwater/storage validation target | P0 | Done | Sprint 5 | Target source and claim rationale documented |
@@ -50,13 +50,24 @@
 | QSE-024 | Dashboard | Add groundwater/storage panel | P0 | Done | Sprint 5 | Dashboard separates groundwater/storage from drought proxy |
 | QSE-025 | Dashboard | Redesign final dashboard hierarchy | P0 | Done | Sprint 6 | First screen explains status, claim boundary, and evidence |
 | QSE-026 | Reporting | Add executive summary export | P1 | Done | Sprint 6 | Markdown or HTML summary generated from run artifacts |
-| QSE-027 | Reporting | Add report bundle manifest | P1 | Todo | Sprint 6 | Final bundle lists artifacts, checksums, command replay |
+| QSE-027 | Reporting | Add report bundle manifest | P1 | Done | Sprint 6 | Final bundle lists dashboard-review artifacts |
 | QSE-028 | Docs | Add scientific claims guide | P0 | Done | Sprint 6 | Claim levels and allowed language documented |
 | QSE-029 | Docs | Add data sources guide | P1 | Done | Sprint 6 | Sources, units, citations, licenses documented |
 | QSE-030 | Docs | Add dashboard guide | P1 | Done | Sprint 6 | Reviewer can understand dashboard sections |
-| QSE-031 | Release | Run final 6-12 month validation | P0 | Todo | Sprint 6 | Final output folder exists with dashboard-ready artifacts |
-| QSE-032 | Release | Complete release checklist and tag | P0 | Todo | Sprint 6 | CI green, release notes written, tag created |
+| QSE-031 | Release | Run minimum six-month Central Valley validation | P0 | Done | Sprint 6 | `outputs/central_valley_groundwater_release` exists with dashboard-ready artifacts |
+| QSE-032 | Release | Complete release checklist and tag | P0 | In Progress | Sprint 7 | CI green, release notes written, tag created |
 | QSE-033 | Data | Add DWR groundwater prep command | P0 | Done | Sprint 5 | Bulk ZIP, station/measurement CSVs, and canonical CSVs normalize to the groundwater schema |
+| QSE-034 | Data | Run live DWR B118 Central Valley basin prep | P0 | Done | Sprint 4 | Local B118 GeoJSON and basin manifest exist with 35 Central Valley basin/subbasin features |
+| QSE-035 | Data | Download official DWR groundwater station and measurement CSVs | P0 | Done | Sprint 5 | Official DWR files are downloaded locally under `data/central_valley/groundwater/raw/` and remain untracked |
+| QSE-036 | Data | Normalize real DWR groundwater observations | P0 | Done | Sprint 5 | Canonical CSV has 221,192 rows, 17 months, 35 basins, preserved raw audit fields |
+| QSE-037 | Data | Add chunked month-window filtering for DWR measurements | P0 | Done | Sprint 5 | Large DWR measurement CSV can be filtered by `--start-month` and `--end-month` without full-history loading |
+| QSE-038 | Data Quality | Restrict DWR basin codes to supplied B118 basins | P0 | Done | Sprint 5 | Statewide DWR rows outside supplied Central Valley basins do not leak into release outputs |
+| QSE-039 | Release | Confirm full target coverage in Central Valley bundle | P0 | Done | Sprint 6 | `coverage_summary.json` reports 6/6 for GRACE, USDM, GLDAS, TWS, basin, and groundwater |
+| QSE-040 | Release | Run preferred twelve-month Central Valley validation | P0 | Ready | Sprint 7 | Twelve-month output exists, or release docs explicitly justify six-month scope |
+| QSE-041 | Dashboard | Complete final visual dashboard review | P0 | Ready | Sprint 7 | First screen, basin map, groundwater time series, lag panel, coverage warnings, and claim boundary pass review |
+| QSE-042 | Docs | Confirm claim consistency across release surfaces | P0 | Ready | Sprint 7 | README, dashboard, docs, and executive summary agree on workflow validation, groundwater begun, discovery not proven, quantum advantage not claimed |
+| QSE-043 | Release | Update final release notes | P0 | Ready | Sprint 7 | Changelog/release notes summarize what is validated and explicitly not validated |
+| QSE-044 | Release | Tag first release | P0 | Todo | Sprint 7 | Release tag is created only after CI, dashboard review, claim review, and checklist completion |
 
 ## Icebox
 
