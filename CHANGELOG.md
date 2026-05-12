@@ -16,5 +16,6 @@
 - Refined the Streamlit dashboard hierarchy, scientific chart styling, coverage timeline, unit-aware hydrology plots, and map color semantics.
 - Added groundwater observation ingestion, basin assignment, monthly aggregation, and GRACE-groundwater metrics.
 - Added Streamlit dashboard groundwater validation and coverage sections.
+- Added interactive dashboard review views for basin metric maps, GRACE-vs-groundwater scatter/regression, and detector F1/FPR tradeoffs.
 - Added final-run `executive_summary.md` export for multimonth validation bundles.
 - Added tests for month normalization, artifact manifests, coverage summaries, groundwater schema handling, basin assignment, and insufficient-month guardrails.

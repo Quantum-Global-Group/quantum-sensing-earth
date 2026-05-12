@@ -37,6 +37,7 @@ DETECTOR_COLORS = {
     "Dbscan": AMBER,
     "Isolation Forest": GREEN,
 }
+SCIENCE_COLORSCALE = [[0.0, RED], [0.5, "#f7f7f7"], [1.0, BLUE]]
 
 
 st.set_page_config(
@@ -109,6 +110,38 @@ def fmt(value: Any, digits: int = 3, suffix: str = "") -> str:
 
 def labelize(value: Any) -> str:
     return str(value).replace("_", " ").replace("-", " ").title()
+
+
+def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    value = hex_color.lstrip("#")
+    return tuple(int(value[index : index + 2], 16) for index in (0, 2, 4))
+
+
+def rgba(hex_color: str, alpha: float) -> str:
+    red, green, blue = hex_to_rgb(hex_color)
+    return f"rgba({red},{green},{blue},{alpha})"
+
+
+def interpolate_hex(left: str, right: str, fraction: float) -> str:
+    fraction = float(np.clip(fraction, 0, 1))
+    left_rgb = hex_to_rgb(left)
+    right_rgb = hex_to_rgb(right)
+    mixed = tuple(round(a + (b - a) * fraction) for a, b in zip(left_rgb, right_rgb))
+    return "#{:02x}{:02x}{:02x}".format(*mixed)
+
+
+def value_color(value: Any, vmin: float, vmax: float, alpha: float = 0.66) -> str:
+    if value is None or pd.isna(value) or pd.isna(vmin) or pd.isna(vmax) or vmin == vmax:
+        return rgba("#aab7c4", alpha)
+    value = float(np.clip(float(value), vmin, vmax))
+    if vmin < 0 < vmax:
+        if value < 0:
+            fraction = (value - vmin) / (0 - vmin)
+            return rgba(interpolate_hex(RED, "#f7f7f7", fraction), alpha)
+        fraction = value / vmax
+        return rgba(interpolate_hex("#f7f7f7", BLUE, fraction), alpha)
+    fraction = (value - vmin) / (vmax - vmin)
+    return rgba(interpolate_hex("#eff6fb", BLUE, fraction), alpha)
 
 
 def inject_css() -> None:
@@ -1375,6 +1408,50 @@ def detection_chart(df: pd.DataFrame, metric: str) -> Any | None:
     return fig
 
 
+def detector_tradeoff_chart(df: pd.DataFrame) -> Any | None:
+    if px is None or df.empty:
+        return None
+    required = {"false_positive_rate", "f1", "iou", "algorithm", "sensor_profile", "threshold", "month"}
+    if not required.issubset(df.columns):
+        return None
+    chart_df = df.copy()
+    chart_df["Detector"] = chart_df["algorithm"].map(labelize)
+    chart_df["Sensor"] = chart_df["sensor_profile"].map(labelize)
+    chart_df["USDM threshold"] = "D" + chart_df["threshold"].astype(str) + "+"
+    chart_df["IoU size"] = chart_df["iou"].fillna(0).clip(lower=0) + 0.04
+    fig = px.scatter(
+        chart_df,
+        x="false_positive_rate",
+        y="f1",
+        color="Detector",
+        symbol="Sensor",
+        size="IoU size",
+        hover_data={
+            "month": True,
+            "USDM threshold": True,
+            "false_positive_rate": ":.3f",
+            "f1": ":.3f",
+            "iou": ":.3f",
+            "IoU size": False,
+        },
+        facet_col="USDM threshold",
+        color_discrete_map=DETECTOR_COLORS,
+        template="plotly_white",
+        labels={"false_positive_rate": "False positive rate", "f1": "F1 score"},
+    )
+    fig.add_hline(y=0.5, line_dash="dash", line_color=AMBER, annotation_text="F1 review reference")
+    fig.add_vline(x=0.1, line_dash="dash", line_color=AMBER, annotation_text="FPR caution")
+    fig.update_xaxes(range=[0, 1])
+    fig.update_yaxes(range=[0, 1])
+    fig.update_layout(
+        title="Detector Tradeoff: F1 Versus False Positives",
+        height=420,
+        margin=dict(l=10, r=10, t=55, b=10),
+        legend_title_text="Detector",
+    )
+    return fig
+
+
 def detection_results(output_dir: Path, filtered: pd.DataFrame, controls: dict[str, Any]) -> None:
     st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
     section_heading(
@@ -1389,6 +1466,9 @@ def detection_results(output_dir: Path, filtered: pd.DataFrame, controls: dict[s
         st.plotly_chart(fig, width="stretch")
     else:
         st.dataframe(filtered, width="stretch", hide_index=True)
+    tradeoff_fig = detector_tradeoff_chart(filtered)
+    if tradeoff_fig is not None:
+        st.plotly_chart(tradeoff_fig, width="stretch")
 
     agg = detection_aggregate(filtered)
     best = best_row(filtered)
@@ -1567,7 +1647,21 @@ def hydrology_chart(metrics: pd.DataFrame, title: str, target_label: str, mode: 
     return fig
 
 
-def basin_map_figure(summary: dict[str, Any]) -> Any | None:
+def geometry_rings(geometry: dict[str, Any]) -> list[list[list[float]]]:
+    geometry_type = geometry.get("type")
+    coordinates = geometry.get("coordinates", [])
+    if geometry_type == "Polygon":
+        return coordinates[:1]
+    if geometry_type == "MultiPolygon":
+        rings: list[list[list[float]]] = []
+        for polygon in coordinates:
+            if polygon:
+                rings.append(polygon[0])
+        return rings
+    return []
+
+
+def basin_map_figure(summary: dict[str, Any], summary_table: pd.DataFrame | None = None, color_metric: str | None = None) -> Any | None:
     if go is None:
         return None
     fixture = summary.get("basin_fixture")
@@ -1580,40 +1674,108 @@ def basin_map_figure(summary: dict[str, Any]) -> Any | None:
         return None
     payload = read_json(str(path))
     fig = go.Figure()
-    colors = [BLUE, GREEN, AMBER, RED, "#6b5fb5"]
+    metric_by_basin: dict[str, pd.Series] = {}
+    vmin = float("nan")
+    vmax = float("nan")
+    if summary_table is not None and not summary_table.empty and color_metric in summary_table.columns:
+        metric_rows = summary_table.drop_duplicates("basin_id").copy()
+        metric_by_basin = {str(row["basin_id"]): row for _, row in metric_rows.iterrows()}
+        numeric_values = pd.to_numeric(metric_rows[color_metric], errors="coerce").dropna()
+        if not numeric_values.empty:
+            vmin = float(numeric_values.min())
+            vmax = float(numeric_values.max())
+            if color_metric and "correlation" in color_metric:
+                vmin = min(vmin, -1.0)
+                vmax = max(vmax, 1.0)
+    all_x: list[float] = []
+    all_y: list[float] = []
     for index, feature in enumerate(payload.get("features", [])):
         props = feature.get("properties", {})
-        coords = feature.get("geometry", {}).get("coordinates", [])
-        if not coords:
+        rings = geometry_rings(feature.get("geometry", {}))
+        if not rings:
             continue
-        ring = coords[0]
-        xs = [point[0] for point in ring]
-        ys = [point[1] for point in ring]
         name = props.get("name", f"Basin {index + 1}")
+        basin_id = str(props.get("basin_id", ""))
+        metric_row = metric_by_basin.get(basin_id)
+        metric_value = metric_row.get(color_metric) if metric_row is not None and color_metric else None
+        fill = value_color(metric_value, vmin, vmax) if color_metric else rgba(BLUE, 0.22)
+        hover_lines = [
+            f"<b>{html.escape(str(name))}</b>",
+            f"Basin ID: {html.escape(basin_id)}",
+            f"Target: {html.escape(str(props.get('target_relevance', 'basin_observation')))}",
+        ]
+        if color_metric and metric_row is not None:
+            hover_lines.extend(
+                [
+                    f"{html.escape(labelize(color_metric))}: {fmt(metric_value)}",
+                    f"Valid months: {html.escape(str(metric_row.get('valid_months', metric_row.get('months', 'n/a'))))}",
+                    f"Sites: {html.escape(str(metric_row.get('site_count', 'n/a')))}",
+                    f"Observations: {html.escape(str(metric_row.get('observation_count', 'n/a')))}",
+                ]
+            )
+        for ring_index, ring in enumerate(rings):
+            xs = [point[0] for point in ring]
+            ys = [point[1] for point in ring]
+            all_x.extend(xs)
+            all_y.extend(ys)
+            fig.add_trace(
+                go.Scatter(
+                    x=xs,
+                    y=ys,
+                    mode="lines",
+                    fill="toself",
+                    name=name if ring_index == 0 else f"{name} part {ring_index + 1}",
+                    line=dict(color=INK, width=0.8),
+                    fillcolor=fill,
+                    opacity=0.9,
+                    hovertemplate="<br>".join(hover_lines) + "<extra></extra>",
+                    showlegend=False,
+                )
+            )
+    if color_metric and not pd.isna(vmin) and not pd.isna(vmax):
         fig.add_trace(
             go.Scatter(
-                x=xs,
-                y=ys,
-                mode="lines",
-                fill="toself",
-                name=name,
-                line=dict(color=colors[index % len(colors)], width=2),
-                fillcolor=colors[index % len(colors)].replace("#", "rgba(") if False else None,
-                opacity=.42,
-                hovertemplate=f"{name}<br>{props.get('target_relevance', 'basin_observation')}<extra></extra>",
+                x=[all_x[0] if all_x else 0],
+                y=[all_y[0] if all_y else 0],
+                mode="markers",
+                marker=dict(
+                    color=[vmin],
+                    cmin=vmin,
+                    cmax=vmax,
+                    colorscale=SCIENCE_COLORSCALE,
+                    showscale=True,
+                    colorbar=dict(title=labelize(color_metric), len=0.72),
+                    opacity=0,
+                ),
+                hoverinfo="skip",
+                showlegend=False,
             )
         )
     fig.update_layout(
-        title="Named Basin Fixtures Over Western U.S. Crop",
+        title="Central Valley Basin Map Colored By Review Metric" if color_metric else "Named Basin Boundaries",
         template="plotly_white",
         height=420,
         margin=dict(l=10, r=10, t=50, b=10),
         xaxis_title="Longitude",
         yaxis_title="Latitude",
-        legend_title_text="Basin",
+        annotations=[
+            dict(
+                text="Hover a basin for source, metric, observation, and site-count context.",
+                xref="paper",
+                yref="paper",
+                x=0,
+                y=1.08,
+                showarrow=False,
+                xanchor="left",
+                font=dict(size=12, color=MUTED),
+            )
+        ],
     )
-    fig.update_xaxes(range=[-125, -102])
-    fig.update_yaxes(range=[31, 49], scaleanchor="x", scaleratio=1)
+    if all_x and all_y:
+        pad_x = max((max(all_x) - min(all_x)) * 0.08, 0.5)
+        pad_y = max((max(all_y) - min(all_y)) * 0.08, 0.5)
+        fig.update_xaxes(range=[min(all_x) - pad_x, max(all_x) + pad_x])
+        fig.update_yaxes(range=[min(all_y) - pad_y, max(all_y) + pad_y], scaleanchor="x", scaleratio=1)
     return fig
 
 
@@ -1665,6 +1827,22 @@ def basin_validation(output_dir: Path, bundle: dict[str, Any]) -> None:
     threshold = st.selectbox("Basin drought threshold", thresholds, index=0, format_func=lambda value: f"D{int(value)}+")
     metrics = metrics[metrics["threshold"].eq(threshold)].copy()
     summary_table = summary_table[summary_table["threshold"].eq(threshold)].copy() if "threshold" in summary_table else summary_table
+    metric_options = [
+        column
+        for column in [
+            "grace_gldas_correlation",
+            "grace_gldas_lag1_correlation",
+            "grace_gldas_trend_agreement",
+            "grace_usdm_correlation",
+            "mean_usdm_drought_coverage_pct",
+        ]
+        if column in summary_table.columns
+    ]
+    color_metric = (
+        st.selectbox("Basin map color", metric_options, index=0, format_func=labelize)
+        if metric_options
+        else None
+    )
 
     best = summary_table.sort_values("grace_gldas_correlation", ascending=False, na_position="last").head(1)
     weakest = summary_table.sort_values("grace_gldas_correlation", ascending=True, na_position="last").head(1)
@@ -1686,7 +1864,7 @@ def basin_validation(output_dir: Path, bundle: dict[str, Any]) -> None:
 
     left, right = st.columns([.9, 1.1])
     with left:
-        fig = basin_map_figure(summary)
+        fig = basin_map_figure(summary, summary_table, color_metric)
         if fig is not None:
             st.plotly_chart(fig, width="stretch")
     with right:
@@ -1747,6 +1925,82 @@ def groundwater_time_series(metrics: pd.DataFrame, monthly: pd.DataFrame, basin_
         legend_title_text="",
     )
     fig.update_yaxes(matches=None)
+    return fig
+
+
+def groundwater_scatter_chart(
+    basin_metrics: pd.DataFrame,
+    monthly: pd.DataFrame,
+    basin_id: str,
+    threshold: int | None,
+) -> Any | None:
+    if px is None or go is None or basin_metrics.empty or monthly.empty:
+        return None
+    basin_monthly = monthly[monthly["basin_id"].astype(str).eq(str(basin_id))].copy()
+    basin_signal = basin_metrics[basin_metrics["basin_id"].astype(str).eq(str(basin_id))].copy()
+    if threshold is not None and "threshold" in basin_signal.columns:
+        basin_signal = basin_signal[basin_signal["threshold"].eq(threshold)]
+    if basin_monthly.empty or basin_signal.empty:
+        return None
+    joined = pd.merge(
+        basin_signal,
+        basin_monthly[["basin_id", "month", "groundwater_level_anomaly", "observation_count", "site_count"]],
+        on=["basin_id", "month"],
+        how="inner",
+    )
+    joined = joined.dropna(subset=["grace_mean_cm", "groundwater_level_anomaly"])
+    if joined.empty:
+        return None
+    fig = px.scatter(
+        joined,
+        x="grace_mean_cm",
+        y="groundwater_level_anomaly",
+        size="observation_count",
+        color="month",
+        hover_data={
+            "month": True,
+            "gldas_mean_cm": ":.3f" if "gldas_mean_cm" in joined.columns else False,
+            "usdm_drought_coverage_pct": ":.1f" if "usdm_drought_coverage_pct" in joined.columns else False,
+            "observation_count": True,
+            "site_count": True,
+        },
+        template="plotly_white",
+        color_discrete_sequence=px.colors.qualitative.Safe,
+        labels={
+            "grace_mean_cm": "GRACE basin mean anomaly (cm EWT)",
+            "groundwater_level_anomaly": "Groundwater level anomaly (feet)",
+        },
+    )
+    if len(joined) >= 2 and joined["grace_mean_cm"].nunique() > 1:
+        coeff = np.polyfit(joined["grace_mean_cm"], joined["groundwater_level_anomaly"], 1)
+        xs = np.linspace(float(joined["grace_mean_cm"].min()), float(joined["grace_mean_cm"].max()), 80)
+        ys = coeff[0] * xs + coeff[1]
+        fig.add_trace(
+            go.Scatter(
+                x=xs,
+                y=ys,
+                mode="lines",
+                line=dict(color=INK, width=2, dash="dash"),
+                name="linear fit",
+                hovertemplate="Linear fit<extra></extra>",
+            )
+        )
+    fig.update_layout(
+        title="GRACE Basin Signal Versus Groundwater Anomaly",
+        height=430,
+        margin=dict(l=10, r=10, t=50, b=10),
+        legend_title_text="Month",
+    )
+    fig.add_annotation(
+        text="Bubble size = DWR observation count. This is relationship evidence, not discovery proof.",
+        xref="paper",
+        yref="paper",
+        x=0,
+        y=1.08,
+        showarrow=False,
+        xanchor="left",
+        font=dict(size=12, color=MUTED),
+    )
     return fig
 
 
@@ -1853,6 +2107,14 @@ def groundwater_validation(output_dir: Path, bundle: dict[str, Any]) -> None:
         fig = groundwater_time_series(metrics, monthly, selected_basin, int(threshold) if threshold is not None else None)
         if fig is not None:
             st.plotly_chart(fig, width="stretch")
+        scatter_fig = groundwater_scatter_chart(
+            bundle["basin_metrics"],
+            monthly,
+            selected_basin,
+            int(threshold) if threshold is not None else None,
+        )
+        if scatter_fig is not None:
+            st.plotly_chart(scatter_fig, width="stretch")
 
     fig = groundwater_lag_chart(summary_table)
     if fig is not None:
