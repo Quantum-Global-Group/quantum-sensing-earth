@@ -4,19 +4,20 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import urllib.request
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+import requests
 import yaml
 
 from src.data.groundwater import (
     assign_observations_to_basins,
     column_lookup,
     normalize_groundwater_dataframe,
+    parse_groundwater_dates,
     validate_groundwater_observations,
 )
 
@@ -48,6 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Which official DWR resource set to download when --download-dwr-periodic is used.",
     )
     parser.add_argument("--download-only", action="store_true", help="Download official DWR files and stop before normalization.")
+    parser.add_argument("--start-month", help="Optional first measurement month to keep, formatted YYYY-MM.")
+    parser.add_argument("--end-month", help="Optional last measurement month to keep, formatted YYYY-MM.")
+    parser.add_argument("--chunksize", type=int, default=250_000, help="Rows per chunk when filtering large measurement CSVs.")
     return parser
 
 
@@ -57,6 +61,54 @@ def parse_args() -> argparse.Namespace:
 
 def read_csv(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
+
+
+def normalize_month_arg(value: str | None) -> str | None:
+    if not value:
+        return None
+    parsed = pd.to_datetime(value, errors="coerce")
+    if pd.isna(parsed):
+        raise SystemExit(f"Invalid month value {value!r}; use YYYY-MM.")
+    return parsed.strftime("%Y-%m")
+
+
+def filter_measurement_months(frame: pd.DataFrame, start_month: str | None, end_month: str | None) -> pd.DataFrame:
+    if not start_month and not end_month:
+        return frame
+    lookup = column_lookup(list(frame.columns))
+    date_column = lookup.get("date")
+    if not date_column:
+        raise ValueError("Could not identify a measurement date column for month filtering.")
+    months = parse_groundwater_dates(frame[date_column]).dt.strftime("%Y-%m")
+    mask = months.notna()
+    if start_month:
+        mask &= months >= start_month
+    if end_month:
+        mask &= months <= end_month
+    return frame.loc[mask].copy()
+
+
+def read_measurements_csv(path: Path, start_month: str | None, end_month: str | None, chunksize: int) -> pd.DataFrame:
+    if not start_month and not end_month:
+        return read_csv(path)
+    frames = []
+    rows_read = 0
+    rows_kept = 0
+    for chunk in pd.read_csv(path, chunksize=chunksize):
+        rows_read += int(len(chunk))
+        filtered = filter_measurement_months(chunk, start_month, end_month)
+        rows_kept += int(len(filtered))
+        if not filtered.empty:
+            frames.append(filtered)
+    if not frames:
+        result = pd.read_csv(path, nrows=0)
+        result.attrs["rows_read"] = rows_read
+        result.attrs["rows_kept"] = 0
+        return result
+    result = pd.concat(frames, ignore_index=True)
+    result.attrs["rows_read"] = rows_read
+    result.attrs["rows_kept"] = rows_kept
+    return result
 
 
 def fetch_json(url: str) -> dict:
@@ -105,10 +157,12 @@ def discover_dwr_resources(api_url: str = DWR_PERIODIC_CKAN_API) -> dict[str, di
 
 def download_url(url: str, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=180) as response:
+    with requests.get(url, headers={"User-Agent": USER_AGENT}, stream=True, timeout=180) as response:
+        response.raise_for_status()
         with destination.open("wb") as fh:
-            shutil.copyfileobj(response, fh)
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    fh.write(chunk)
 
 
 def download_dwr_periodic(download_dir: Path, resource_mode: str) -> tuple[dict[str, Path], dict]:
@@ -186,11 +240,18 @@ def merge_station_measurements(stations: pd.DataFrame, measurements: pd.DataFram
         how="left",
         suffixes=("", "_station"),
     )
+    for column in ["basin_code", "basin_name"]:
+        station_column = f"{column}_station"
+        if column in merged.columns and station_column in merged.columns:
+            missing = merged[column].isna() | merged[column].astype(str).str.strip().isin({"", "nan", "None"})
+            merged.loc[missing, column] = merged.loc[missing, station_column]
     return merged
 
 
 def load_input(args: argparse.Namespace) -> tuple[pd.DataFrame, dict]:
-    metadata: dict = {"source_mode": None, "source_files": []}
+    start_month = normalize_month_arg(args.start_month)
+    end_month = normalize_month_arg(args.end_month)
+    metadata: dict = {"source_mode": None, "source_files": [], "start_month": start_month, "end_month": end_month}
     if args.download_dwr_periodic:
         downloaded, download_manifest = download_dwr_periodic(Path(args.download_dir), args.download_resource)
         metadata["download_manifest"] = download_manifest
@@ -205,8 +266,16 @@ def load_input(args: argparse.Namespace) -> tuple[pd.DataFrame, dict]:
     if args.stations and args.measurements:
         stations_path = Path(args.stations)
         measurements_path = Path(args.measurements)
-        metadata.update({"source_mode": "stations_measurements_csv", "source_files": [str(stations_path), str(measurements_path)]})
-        return merge_station_measurements(read_csv(stations_path), read_csv(measurements_path)), metadata
+        measurements = read_measurements_csv(measurements_path, start_month, end_month, args.chunksize)
+        metadata.update(
+            {
+                "source_mode": "stations_measurements_csv",
+                "source_files": [str(stations_path), str(measurements_path)],
+                "measurement_rows_read": int(measurements.attrs.get("rows_read", len(measurements))),
+                "measurement_rows_kept": int(measurements.attrs.get("rows_kept", len(measurements))),
+            }
+        )
+        return merge_station_measurements(read_csv(stations_path), measurements), metadata
 
     if not args.input:
         raise SystemExit("Pass --input, or pass both --stations and --measurements.")
@@ -220,14 +289,17 @@ def load_input(args: argparse.Namespace) -> tuple[pd.DataFrame, dict]:
         if station_member and measurement_member and station_member != measurement_member:
             metadata["station_member"] = station_member
             metadata["measurement_member"] = measurement_member
-            return merge_station_measurements(read_zip_csv(input_path, station_member), read_zip_csv(input_path, measurement_member)), metadata
+            return merge_station_measurements(
+                read_zip_csv(input_path, station_member),
+                filter_measurement_months(read_zip_csv(input_path, measurement_member), start_month, end_month),
+            ), metadata
         if len(members) == 1:
             metadata["combined_member"] = members[0]
-            return read_zip_csv(input_path, members[0]), metadata
+            return filter_measurement_months(read_zip_csv(input_path, members[0]), start_month, end_month), metadata
         raise SystemExit("ZIP input must contain either one combined CSV or identifiable station and measurement CSVs.")
 
     metadata.update({"source_mode": "combined_csv", "source_files": [str(input_path)]})
-    return read_csv(input_path), metadata
+    return filter_measurement_months(read_csv(input_path), start_month, end_month), metadata
 
 
 def write_manifest(path: Path, payload: dict) -> None:
@@ -277,6 +349,10 @@ def main(argv: list[str] | None = None) -> dict:
             "files": metadata.get("source_files", []),
             "zip_members": metadata.get("zip_members", []),
             "download_manifest": metadata.get("download_manifest"),
+            "start_month": metadata.get("start_month"),
+            "end_month": metadata.get("end_month"),
+            "measurement_rows_read": metadata.get("measurement_rows_read"),
+            "measurement_rows_kept": metadata.get("measurement_rows_kept"),
         },
         "basins": str(args.basins),
         "output": str(output),

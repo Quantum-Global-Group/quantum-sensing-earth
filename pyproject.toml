@@ -14,6 +14,7 @@ dependencies = [
   "scikit-learn",
   "pyyaml",
   "matplotlib",
+  "requests",
 ]
 
 [project.optional-dependencies]

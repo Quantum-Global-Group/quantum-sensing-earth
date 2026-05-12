@@ -42,7 +42,7 @@ ALIASES = {
     "source": ["source", "data_source", "agency"],
     "latitude": ["latitude", "lat", "y", "station_latitude"],
     "longitude": ["longitude", "lon", "long", "x", "station_longitude"],
-    "basin_id": ["basin_id", "basin id", "basin_number", "basin_subbasin_number"],
+    "basin_id": ["basin_id", "basin id", "basin_code", "basin code", "basin_number", "basin_subbasin_number"],
     "basin_name": ["basin_name", "basin name", "basin_subbasin_name"],
     "date": ["date", "measurement_date", "measurement date", "msmt_date", "msmt date", "datetime", "time"],
     "value": [
@@ -85,6 +85,13 @@ def column_lookup(columns: list[str]) -> dict[str, str]:
     return lookup
 
 
+def parse_groundwater_dates(values: Any) -> pd.Series:
+    try:
+        return pd.to_datetime(values, errors="coerce", format="mixed")
+    except (TypeError, ValueError):
+        return pd.to_datetime(values, errors="coerce")
+
+
 def normalize_groundwater_dataframe(
     frame: pd.DataFrame,
     source: str = "dwr-periodic",
@@ -101,9 +108,12 @@ def normalize_groundwater_dataframe(
     normalized["site_name"] = normalized["site_name"].fillna(normalized["site_id"])
     normalized["value_units"] = normalized["value_units"].fillna("unknown")
     normalized["measurement_type"] = normalized["measurement_type"].fillna(infer_measurement_type(lookup.get("value", "")))
+    if source == "dwr-periodic" and lookup.get("value") in {"gwe", "wlm_rpe", "wlm_gse", "gse_gwe"}:
+        normalized["value_units"] = normalized["value_units"].replace({"unknown": "feet"}).fillna("feet")
+        normalized["measurement_type"] = infer_measurement_type(lookup.get("value", ""))
     normalized["quality_flag"] = normalized["quality_flag"].fillna("")
     normalized["source_url"] = normalized["source_url"].fillna(source_url or source_file or "")
-    normalized["date"] = pd.to_datetime(normalized["date"], errors="coerce")
+    normalized["date"] = parse_groundwater_dates(normalized["date"])
     normalized["month"] = normalized["date"].map(normalize_month_key)
     normalized["value"] = pd.to_numeric(normalized["value"], errors="coerce")
     normalized["latitude"] = pd.to_numeric(normalized["latitude"], errors="coerce")
@@ -131,8 +141,10 @@ def infer_measurement_type(value_column: str) -> str:
     text = canonical_header(value_column)
     if "depth" in text or "wlm" in text:
         return "depth_to_water"
-    if "elev" in text or "wse" in text or "gwe" in text:
+    if "elev" in text or "wse" in text or text == "gwe" or "groundwater_elevation" in text:
         return "groundwater_elevation"
+    if text == "gse_gwe":
+        return "depth_to_water"
     return "groundwater_level"
 
 
@@ -208,9 +220,17 @@ def geometry_contains_point(geometry: dict[str, Any], lon: float, lat: float) ->
 
 def assign_observations_to_basins(frame: pd.DataFrame, basins_path: Path) -> pd.DataFrame:
     features = load_geojson_features(basins_path)
+    features_by_id = {str(feature["basin_id"]).strip(): feature for feature in features}
     assigned = frame.copy()
     for idx, row in assigned.iterrows():
-        if pd.notna(row.get("basin_id")) and str(row.get("basin_id")).strip():
+        existing_basin_id = str(row.get("basin_id")).strip() if pd.notna(row.get("basin_id")) else ""
+        if existing_basin_id and existing_basin_id in features_by_id:
+            if pd.isna(row.get("basin_name")) or not str(row.get("basin_name")).strip():
+                assigned.at[idx, "basin_name"] = features_by_id[existing_basin_id]["basin_name"]
+            continue
+        if existing_basin_id and existing_basin_id not in features_by_id:
+            assigned.at[idx, "basin_id"] = np.nan
+            assigned.at[idx, "basin_name"] = np.nan
             continue
         lon = row.get("longitude")
         lat = row.get("latitude")

@@ -22,13 +22,29 @@ The finished project may not say:
 | --- | --- | --- |
 | Package, CLI, demo, CI | Mostly done | Repo is reviewable and CI is passing. |
 | GRACE/GRACE-FO + USDM workflow | Mostly done | Multimonth drought-proxy workflow works and is dashboard-ready. |
-| GLDAS/TWS hydrology track | Partial | Metrics exist; doctor/download hardening and metadata checks still need work. |
-| Central Valley basin workflow | Scaffold done | B118 prep exists; final release must use live authoritative basin output locally. |
-| DWR groundwater workflow | Scaffold done | Downloader/prep exists; final release needs real normalized DWR observations and basin coverage. |
-| Basin/groundwater metrics | Scaffold done | Metrics exist; final release needs valid real basin/month coverage. |
+| GLDAS/TWS hydrology track | Mostly done | Metrics and 6/6 release-run coverage exist; doctor/metadata checks still need hardening. |
+| Central Valley basin workflow | Live local output done | Live B118 prep produced 35 Central Valley basin/subbasin features locally. |
+| DWR groundwater workflow | Live local output done | Official DWR station/measurement files were downloaded and normalized into canonical observations. |
+| Basin/groundwater metrics | Live local output done | First six-month Central Valley release bundle has valid basin/month groundwater coverage. |
 | Streamlit dashboard | Review design mostly done | Hierarchy, claim boundary, coverage, map, hydrology, basin, and groundwater sections exist. |
-| Final evidence bundle | Not done | Needs a real 6-12 month Central Valley run and release artifact review. |
+| Final evidence bundle | Six-month local bundle done | Six-month bundle passes coverage checks; twelve-month run and visual release review remain. |
 | Quantum advantage evidence | Not started | Keep out of v1 claim unless sensitivity analysis supports it later. |
+
+## P0 Progress Snapshot
+
+Local progress as of 2026-05-12:
+
+| Item | Result |
+| --- | --- |
+| Live DWR B118 basins | `data/central_valley/basins/central_valley_b118_basins.geojson`, 35 features. |
+| Basin manifest | `data/central_valley/basins/central_valley_basin_manifest.yaml`, with source URL, download date, CRS, citation, filter method, and limitations. |
+| DWR raw downloads | Official Stations and Measurements CSVs downloaded under `data/central_valley/groundwater/raw/`. |
+| DWR clean groundwater CSV | `data/central_valley/groundwater/dwr_groundwater_clean.csv`, 221,192 rows, 17 months from 2024-12 through 2026-04, 35 basins. |
+| Groundwater value convention | DWR `gwe` values normalized as `groundwater_elevation` in feet; raw value/date/source audit fields are preserved. |
+| First Central Valley evidence bundle | `outputs/central_valley_groundwater_release`, six GRACE-FO months from 2024-12 through 2025-05. |
+| Coverage | GRACE, USDM, GLDAS, TWS, basin, and groundwater are all `6/6` in `coverage_summary.json`. |
+| Groundwater summary | `groundwater_summary.json` status is `ok`, with 93 valid basin/threshold rows and 12 `insufficient_months` rows. |
+| Verification | `python -m pytest -q` passed, demo smoke passed, and Streamlit responded on the Central Valley output. |
 
 ## P0 Finish Tasks
 
@@ -36,51 +52,51 @@ These are required before tagging the first credible Central Valley validation r
 
 ### 1. Real DWR Basin And Groundwater Data
 
-- [ ] Run live DWR Bulletin 118 basin prep.
-- [ ] Confirm `data/central_valley/basins/central_valley_b118_basins.geojson` exists locally.
-- [ ] Confirm `data/central_valley/basins/central_valley_basin_manifest.yaml` records source URL, download date, CRS, citation, filter method, and limitations.
-- [ ] Download official DWR Periodic Groundwater Level Measurements using the prep command or manually supplied files.
-- [ ] Normalize DWR observations into `data/central_valley/groundwater/dwr_groundwater_clean.csv`.
-- [ ] Verify site coordinates, dates, units, measurement type, raw values, and source URL are preserved.
-- [ ] Verify wells join to DWR B118 basins by point-in-polygon when basin fields are missing.
-- [ ] Confirm at least one Central Valley basin has three or more valid groundwater months.
-- [ ] Document if groundwater values are depth-to-water, groundwater elevation, or mixed.
+- [x] Run live DWR Bulletin 118 basin prep.
+- [x] Confirm `data/central_valley/basins/central_valley_b118_basins.geojson` exists locally.
+- [x] Confirm `data/central_valley/basins/central_valley_basin_manifest.yaml` records source URL, download date, CRS, citation, filter method, and limitations.
+- [x] Download official DWR Periodic Groundwater Level Measurements using the prep command or manually supplied files.
+- [x] Normalize DWR observations into `data/central_valley/groundwater/dwr_groundwater_clean.csv`.
+- [x] Verify site coordinates, dates, units, measurement type, raw values, and source URL are preserved.
+- [x] Verify wells join to DWR B118 basins by point-in-polygon when basin fields are missing.
+- [x] Confirm at least one Central Valley basin has three or more valid groundwater months.
+- [x] Document if groundwater values are depth-to-water, groundwater elevation, or mixed.
 
 ### 2. Final 6-12 Month Central Valley Run
 
-- [ ] Run a minimum six-month GRACE-FO Central Valley validation.
+- [x] Run a minimum six-month GRACE-FO Central Valley validation.
 - [ ] Prefer twelve recent GRACE-FO months if data coverage allows.
-- [ ] Include USDM thresholds D1+, D2+, and D3+.
-- [ ] Include z-score, DBSCAN, and isolation forest.
-- [ ] Include four spatial folds.
-- [ ] Include DWR B118 basins.
-- [ ] Include DWR groundwater observations.
-- [ ] Include GLDAS/TWS where available.
-- [ ] Export `timeline_metrics.csv`.
-- [ ] Export `coverage_summary.json`.
-- [ ] Export `month_alignment.csv`.
-- [ ] Export `artifact_manifest.json`.
-- [ ] Export `basin_metrics.csv`.
-- [ ] Export `basin_summary.csv` and `basin_summary.json`.
-- [ ] Export `groundwater_observations.csv`.
-- [ ] Export `groundwater_basin_monthly.csv`.
-- [ ] Export `groundwater_validation_metrics.csv`.
-- [ ] Export `groundwater_validation_summary.csv` and `.json`.
-- [ ] Export `executive_summary.md`.
+- [x] Include USDM thresholds D1+, D2+, and D3+.
+- [x] Include z-score, DBSCAN, and isolation forest.
+- [x] Include four spatial folds.
+- [x] Include DWR B118 basins.
+- [x] Include DWR groundwater observations.
+- [x] Include GLDAS/TWS where available.
+- [x] Export `timeline_metrics.csv`.
+- [x] Export `coverage_summary.json`.
+- [x] Export `month_alignment.csv`.
+- [x] Export `artifact_manifest.json`.
+- [x] Export `basin_metrics.csv`.
+- [x] Export `basin_summary.csv` and `basin_summary.json`.
+- [x] Export `groundwater_observations.csv`.
+- [x] Export `groundwater_basin_monthly.csv`.
+- [x] Export `groundwater_validation_metrics.csv`.
+- [x] Export `groundwater_validation_summary.csv` and `.json`.
+- [x] Export `executive_summary.md`.
 
 ### 3. Coverage And Claim Integrity
 
-- [ ] Show month coverage for GRACE, USDM, GLDAS, TWS, basin, and groundwater.
-- [ ] Make missing hydrology or groundwater months visible in `month_alignment.csv`.
-- [ ] Make missing months visible in the dashboard top screen.
-- [ ] Ensure partial hydrology coverage cannot be summarized as complete evidence.
-- [ ] Ensure groundwater rows with fewer than three valid months are marked `insufficient_months`.
-- [ ] Ensure `insufficient_months` rows are not ranked as strongest evidence.
+- [x] Show month coverage for GRACE, USDM, GLDAS, TWS, basin, and groundwater.
+- [x] Make missing hydrology or groundwater months visible in `month_alignment.csv`.
+- [x] Make missing months visible in the dashboard top screen.
+- [x] Ensure partial hydrology coverage cannot be summarized as complete evidence.
+- [x] Ensure groundwater rows with fewer than three valid months are marked `insufficient_months`.
+- [x] Ensure `insufficient_months` rows are not ranked as strongest evidence.
 - [ ] Confirm README, dashboard, docs, and executive summary all use the same claim level.
 
 ### 4. Dashboard Final Review
 
-- [ ] Open Streamlit on the final Central Valley output.
+- [x] Open Streamlit on the final Central Valley output.
 - [ ] Confirm first screen states the current defensible claim.
 - [ ] Confirm claim boundary says groundwater discovery is not proven.
 - [ ] Confirm quantum advantage is not claimed.
@@ -96,12 +112,12 @@ These are required before tagging the first credible Central Valley validation r
 
 ### 5. Release Verification
 
-- [ ] `python -m pytest -q` passes.
-- [ ] `python -m quantum_sensing_earth.demo --output outputs/demo` passes.
+- [x] `python -m pytest -q` passes.
+- [x] `python -m quantum_sensing_earth.demo --output outputs/demo` passes.
 - [ ] GitHub Actions passes on `main`.
-- [ ] Final Central Valley dashboard opens locally.
-- [ ] `data/` and `outputs/` remain untracked.
-- [ ] No Earthdata tokens, DWR downloads, `.netrc`, API keys, or local credentials are committed.
+- [x] Final Central Valley dashboard opens locally.
+- [x] `data/` and `outputs/` remain untracked.
+- [x] No Earthdata tokens, DWR downloads, `.netrc`, API keys, or local credentials are committed.
 - [ ] Release notes summarize what is validated and what is not validated.
 - [ ] Release checklist is completed.
 - [ ] First release tag is created only after the final evidence bundle is reviewed.

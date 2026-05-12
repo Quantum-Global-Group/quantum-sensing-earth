@@ -11,6 +11,7 @@ from src.data.groundwater import (
     validate_groundwater_observations,
     write_groundwater_track,
 )
+from src.data.groundwater import normalize_groundwater_dataframe
 
 
 FIXTURES = Path(__file__).resolve().parents[1] / "examples" / "central_valley"
@@ -26,6 +27,34 @@ def test_point_in_polygon_assigns_tiny_basin():
     assert not geometry_contains_point(geometry, -120.0, 36.0)
 
 
+def test_assign_observations_restricts_existing_codes_to_supplied_basins():
+    observations = pd.DataFrame(
+        [
+            {
+                "site_id": "outside",
+                "latitude": 34.0,
+                "longitude": -118.0,
+                "basin_id": "9-999",
+                "basin_name": "Not In Fixture",
+            },
+            {
+                "site_id": "inside",
+                "latitude": 39.1,
+                "longitude": -121.8,
+                "basin_id": "",
+                "basin_name": "",
+            },
+        ]
+    )
+
+    assigned = assign_observations_to_basins(observations, FIXTURES / "tiny_b118_basins.geojson")
+
+    outside = assigned[assigned["site_id"].eq("outside")].iloc[0]
+    inside = assigned[assigned["site_id"].eq("inside")].iloc[0]
+    assert pd.isna(outside["basin_id"])
+    assert inside["basin_id"] == "5-022.01"
+
+
 def test_groundwater_observations_normalize_and_assign_to_basins():
     observations = normalize_groundwater_observations(FIXTURES / "tiny_groundwater_observations.csv", source="fixture")
     assigned = assign_observations_to_basins(observations, FIXTURES / "tiny_b118_basins.geojson")
@@ -34,6 +63,39 @@ def test_groundwater_observations_normalize_and_assign_to_basins():
     assert validation["errors"] == []
     assert set(assigned["basin_id"].dropna()) == {"5-022.01", "5-022.15"}
     assert set(assigned["month"].dropna()) == {"2025-01", "2025-02", "2025-03"}
+
+
+def test_dwr_gwe_normalizes_as_groundwater_elevation_feet():
+    frame = pd.DataFrame(
+        [
+            {
+                "site_code": "DWR-1",
+                "msmt_date": "2026-03-19 00:00:00",
+                "gwe": 536.68,
+                "latitude": 36.5,
+                "longitude": -121.7,
+                "basin_code": "5-022.01",
+                "basin_name": "Example Basin",
+            },
+            {
+                "site_code": "DWR-2",
+                "msmt_date": "2026-03-20",
+                "gwe": 535.10,
+                "latitude": 36.6,
+                "longitude": -121.8,
+                "basin_code": "5-022.01",
+                "basin_name": "Example Basin",
+            },
+        ]
+    )
+
+    normalized = normalize_groundwater_dataframe(frame, source="dwr-periodic")
+
+    assert normalized["value"].iloc[0] == 536.68
+    assert normalized["value_units"].iloc[0] == "feet"
+    assert normalized["measurement_type"].iloc[0] == "groundwater_elevation"
+    assert normalized["basin_id"].iloc[0] == "5-022.01"
+    assert set(normalized["month"]) == {"2026-03"}
 
 
 def test_groundwater_monthly_anomaly_flips_depth_to_water_sign():

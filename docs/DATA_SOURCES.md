@@ -50,8 +50,10 @@ This project separates data-source credibility from detector performance. Every 
 - Validation use: wells are joined to DWR B118 basins, aggregated to monthly basin values, converted into basin groundwater-level anomalies, then compared against GRACE basin means.
 - Discovery source: the command reads the official CNRA CKAN package API for the current Stations, Measurements, and Bulk Data Download resource URLs.
 - Download-only command: `python examples/central_valley/prepare_dwr_groundwater.py --download-dwr-periodic --download-only --download-dir data/central_valley/groundwater/raw`
-- Preparation command: `python examples/central_valley/prepare_dwr_groundwater.py --download-dwr-periodic --download-resource stations-measurements --basins data/central_valley/basins/central_valley_b118_basins.geojson --output data/central_valley/groundwater/dwr_groundwater_clean.csv --drop-unassigned`
+- Preparation command: `python examples/central_valley/prepare_dwr_groundwater.py --stations data/central_valley/groundwater/raw/stations.csv --measurements data/central_valley/groundwater/raw/measurements.csv --start-month 2024-12 --end-month 2026-04 --basins data/central_valley/basins/central_valley_b118_basins.geojson --output data/central_valley/groundwater/dwr_groundwater_clean.csv --drop-unassigned`
 - Manual input command: `python examples/central_valley/prepare_dwr_groundwater.py --input path/to/dwr_bulk.zip --basins data/central_valley/basins/central_valley_b118_basins.geojson --output data/central_valley/groundwater/dwr_groundwater_clean.csv --drop-unassigned`
+- Large-file handling: use `--start-month`, `--end-month`, and `--chunksize` when reading separate DWR station/measurement CSVs.
+- Current DWR value convention: the release path normalizes DWR `gwe` fields as `groundwater_elevation` in feet and preserves raw audit columns.
 - Minimum evidence rule: metrics with fewer than three valid basin/month pairs are marked `insufficient_months`.
 
 ## Supplemental Groundwater Target

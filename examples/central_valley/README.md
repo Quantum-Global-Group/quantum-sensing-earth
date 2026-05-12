@@ -33,6 +33,30 @@ For separate station and measurement exports:
 python examples/central_valley/prepare_dwr_groundwater.py ^
   --stations path\to\stations.csv ^
   --measurements path\to\measurements.csv ^
+  --start-month 2024-12 ^
+  --end-month 2026-04 ^
+  --basins data\central_valley\basins\central_valley_b118_basins.geojson ^
+  --output data\central_valley\groundwater\dwr_groundwater_clean.csv ^
+  --drop-unassigned
+```
+
+To fetch the current official DWR Stations and Measurements CSVs before normalizing them:
+
+```bash
+python examples/central_valley/prepare_dwr_groundwater.py ^
+  --download-dwr-periodic ^
+  --download-only ^
+  --download-dir data\central_valley\groundwater\raw
+```
+
+Then normalize the downloaded files with a month window so the large measurements file can be processed in chunks:
+
+```bash
+python examples/central_valley/prepare_dwr_groundwater.py ^
+  --stations data\central_valley\groundwater\raw\stations.csv ^
+  --measurements data\central_valley\groundwater\raw\measurements.csv ^
+  --start-month 2024-12 ^
+  --end-month 2026-04 ^
   --basins data\central_valley\basins\central_valley_b118_basins.geojson ^
   --output data\central_valley\groundwater\dwr_groundwater_clean.csv ^
   --drop-unassigned
@@ -56,6 +80,7 @@ The output uses the canonical schema below and also preserves raw audit fields s
 - `source_url`
 
 If `basin_id` is missing, the runner assigns wells to B118 basins by point-in-polygon using latitude/longitude.
+When DWR `gwe` is the selected value field, it is normalized as `groundwater_elevation` in feet.
 
 ## Central Valley Runner Example
 

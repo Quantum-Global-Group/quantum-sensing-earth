@@ -62,6 +62,35 @@ def test_prepare_dwr_groundwater_reads_zip_export(tmp_path):
     assert set(frame["month"]) == {"2025-01", "2025-02", "2025-03"}
 
 
+def test_prepare_dwr_groundwater_filters_measurement_months(tmp_path):
+    output = tmp_path / "filtered.csv"
+    manifest = tmp_path / "filtered_manifest.yaml"
+
+    prepare_dwr_groundwater(
+        [
+            "--stations",
+            str(FIXTURES / "tiny_dwr_stations.csv"),
+            "--measurements",
+            str(FIXTURES / "tiny_dwr_measurements.csv"),
+            "--basins",
+            str(FIXTURES / "tiny_b118_basins.geojson"),
+            "--output",
+            str(output),
+            "--manifest",
+            str(manifest),
+            "--start-month",
+            "2025-02",
+            "--end-month",
+            "2025-02",
+            "--drop-unassigned",
+        ]
+    )
+
+    frame = pd.read_csv(output)
+    assert len(frame) == 2
+    assert set(frame["month"]) == {"2025-02"}
+
+
 def test_prepare_dwr_groundwater_download_only_uses_official_manifest(tmp_path, monkeypatch):
     download_dir = tmp_path / "raw"
 

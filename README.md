@@ -154,20 +154,17 @@ python -m streamlit run src/dashboard/app.py -- --output outputs/gracefo_recent_
 
 Older GRACE runs, such as the April 2002 demo, are useful for pipeline testing but should not be treated as present-day drought or groundwater evidence. The dashboard flags stale runs and recommends regenerating with current GRACE-FO collections.
 
-Run the Central Valley groundwater-validation scaffold after preparing DWR Bulletin 118 basin boundaries and a DWR groundwater observation CSV:
+Run the Central Valley groundwater-validation workflow after preparing DWR Bulletin 118 basin boundaries and a DWR groundwater observation CSV:
 
 ```bash
 python examples/central_valley/prepare_central_valley_basins.py
-python examples/central_valley/prepare_dwr_groundwater.py --download-dwr-periodic --download-resource stations-measurements --basins data\central_valley\basins\central_valley_b118_basins.geojson --output data\central_valley\groundwater\dwr_groundwater_clean.csv --drop-unassigned
+python examples/central_valley/prepare_dwr_groundwater.py --download-dwr-periodic --download-only --download-dir data\central_valley\groundwater\raw
+python examples/central_valley/prepare_dwr_groundwater.py --stations data\central_valley\groundwater\raw\stations.csv --measurements data\central_valley\groundwater\raw\measurements.csv --start-month 2024-12 --end-month 2026-04 --basins data\central_valley\basins\central_valley_b118_basins.geojson --output data\central_valley\groundwater\dwr_groundwater_clean.csv --drop-unassigned
 python examples/grace_tellus/run_multimonth_usdm.py --mission grace-fo --study-region central-valley --months 12 --thresholds 1 2 3 --spatial-folds 4 --groundwater-observations data\central_valley\groundwater\dwr_groundwater_clean.csv --groundwater-source dwr-periodic --output outputs\central_valley_groundwater_release
 python -m streamlit run src/dashboard/app.py -- --output outputs/central_valley_groundwater_release
 ```
 
-To fetch the official DWR files without immediately normalizing them:
-
-```bash
-python examples/central_valley/prepare_dwr_groundwater.py --download-dwr-periodic --download-only --download-dir data\central_valley\groundwater\raw
-```
+The DWR measurement file is large, so the normalization command supports `--start-month`, `--end-month`, and `--chunksize` for release-window filtering without loading the entire measurement history at once.
 
 This starts groundwater validation with basin wells. It still does not prove groundwater discovery or quantum advantage.
 
