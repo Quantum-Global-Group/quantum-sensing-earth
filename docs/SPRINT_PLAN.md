@@ -245,9 +245,9 @@ The final release must be readable, defensible, and hard to overclaim.
 
 ### Committed Work
 
-- [ ] Redesign dashboard information hierarchy.
+- [x] Redesign dashboard information hierarchy.
 - [x] Add executive summary export.
-- [ ] Add final reviewer verdict panel.
+- [x] Add final reviewer verdict panel.
 - [ ] Add detector confusion overlays.
 - [ ] Add report bundle manifest.
 - [x] Add `docs/SCIENTIFIC_CLAIMS.md`.

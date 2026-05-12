@@ -48,7 +48,7 @@
 | QSE-022 | Data | Add groundwater/storage observation loader | P0 | Done | Sprint 5 | Loader reads observations and validates schema |
 | QSE-023 | Science | Add basin/month observation metrics | P0 | Done | Sprint 5 | Correlation, lagged correlation, trend, sign agreement exported |
 | QSE-024 | Dashboard | Add groundwater/storage panel | P0 | Done | Sprint 5 | Dashboard separates groundwater/storage from drought proxy |
-| QSE-025 | Dashboard | Redesign final dashboard hierarchy | P0 | Review | Sprint 6 | First screen explains status, claim boundary, and evidence |
+| QSE-025 | Dashboard | Redesign final dashboard hierarchy | P0 | Done | Sprint 6 | First screen explains status, claim boundary, and evidence |
 | QSE-026 | Reporting | Add executive summary export | P1 | Done | Sprint 6 | Markdown or HTML summary generated from run artifacts |
 | QSE-027 | Reporting | Add report bundle manifest | P1 | Todo | Sprint 6 | Final bundle lists artifacts, checksums, command replay |
 | QSE-028 | Docs | Add scientific claims guide | P0 | Done | Sprint 6 | Claim levels and allowed language documented |

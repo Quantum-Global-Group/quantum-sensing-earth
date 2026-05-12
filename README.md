@@ -22,6 +22,7 @@ What it does not prove:
 
 - [What this project does](docs/WHAT_THIS_PROJECT_DOES.md)
 - [Finish-line plan](docs/FINISH_LINE_PLAN.md)
+- [Finish remaining work](docs/FINISH_REMAINING_WORK.md)
 - [Sprint plan](docs/SPRINT_PLAN.md)
 - [Product backlog](docs/PRODUCT_BACKLOG.md)
 - [Project management plan](docs/PROJECT_MANAGEMENT_PLAN.md)

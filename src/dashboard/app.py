@@ -30,6 +30,13 @@ GREEN = "#2f7d55"
 AMBER = "#b7791f"
 INK = "#14212f"
 MUTED = "#5b6f82"
+SOFT_BORDER = "#d9e2ea"
+WATER_DIVERGING = [[0.0, "#b45f06"], [0.5, "#f7f7f7"], [1.0, BLUE]]
+DETECTOR_COLORS = {
+    "Z Score": BLUE,
+    "Dbscan": AMBER,
+    "Isolation Forest": GREEN,
+}
 
 
 st.set_page_config(
@@ -123,6 +130,9 @@ def inject_css() -> None:
             padding-bottom: 3rem;
             max-width: 1320px;
         }
+        .stApp {
+            background: #fbfcfd;
+        }
         h1, h2, h3 {
             letter-spacing: 0;
             color: var(--qse-ink);
@@ -139,7 +149,6 @@ def inject_css() -> None:
             margin-bottom: .35rem;
         }
         .qse-title {
-            border-bottom: 1px solid var(--qse-border);
             padding-bottom: 1rem;
             margin-bottom: 1.2rem;
         }
@@ -155,9 +164,103 @@ def inject_css() -> None:
             margin: 0;
         }
         .qse-section {
-            border-top: 1px solid var(--qse-border);
-            padding-top: 1.25rem;
-            margin-top: 1.55rem;
+            padding-top: 1.35rem;
+            margin-top: 1.8rem;
+        }
+        .qse-section-title {
+            max-width: 58rem;
+            margin-bottom: .75rem;
+        }
+        .qse-section-title .eyebrow {
+            color: var(--qse-blue);
+            font-size: .72rem;
+            font-weight: 850;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            margin-bottom: .25rem;
+        }
+        .qse-section-title h2 {
+            font-size: 1.55rem;
+            margin: 0 0 .25rem 0;
+            line-height: 1.2;
+        }
+        .qse-section-title p {
+            color: var(--qse-muted);
+            font-size: .98rem;
+            margin: 0;
+            line-height: 1.4;
+        }
+        .qse-review-grid {
+            display: grid;
+            grid-template-columns: minmax(280px, 1.05fr) minmax(360px, 1.45fr) minmax(250px, .9fr);
+            gap: .9rem;
+            align-items: stretch;
+            margin-bottom: .9rem;
+        }
+        .qse-primary-insight {
+            border: 1px solid #9cc3df;
+            border-left: 6px solid var(--qse-blue);
+            background: linear-gradient(180deg, #ffffff 0%, #f3f8fc 100%);
+            border-radius: 8px;
+            padding: 1rem 1.05rem;
+            min-height: 18.4rem;
+        }
+        .qse-primary-insight h2 {
+            margin: .1rem 0 .55rem 0;
+            font-size: clamp(1.45rem, 2vw, 2.05rem);
+            line-height: 1.12;
+        }
+        .qse-primary-insight p {
+            color: #263646;
+            margin: 0 0 .8rem 0;
+            line-height: 1.42;
+        }
+        .qse-primary-insight dl {
+            display: grid;
+            grid-template-columns: 112px 1fr;
+            gap: .4rem .65rem;
+            margin: .9rem 0 0 0;
+        }
+        .qse-primary-insight dt {
+            color: var(--qse-muted);
+            font-weight: 800;
+            font-size: .82rem;
+        }
+        .qse-primary-insight dd {
+            margin: 0;
+            color: var(--qse-ink);
+            font-weight: 700;
+        }
+        .qse-side-panel {
+            border: 1px solid var(--qse-border);
+            background: #fff;
+            border-radius: 8px;
+            padding: .95rem 1rem;
+            min-height: 18.4rem;
+        }
+        .qse-side-panel h3 {
+            margin: 0 0 .55rem 0;
+            font-size: 1rem;
+        }
+        .qse-side-panel ul {
+            margin: .2rem 0 0 0;
+            padding-left: 1.05rem;
+            color: #263646;
+        }
+        .qse-side-panel li {
+            margin-bottom: .48rem;
+            line-height: 1.32;
+        }
+        .qse-claim-pill {
+            display: inline-block;
+            border-radius: 999px;
+            padding: .18rem .55rem;
+            font-size: .75rem;
+            font-weight: 850;
+            margin-bottom: .6rem;
+            background: #fff7e6;
+            color: #7a4a00;
+            border: 1px solid #ebd099;
         }
         .qse-card {
             border: 1px solid var(--qse-border);
@@ -168,7 +271,7 @@ def inject_css() -> None:
         }
         .qse-metric-grid {
             display: grid;
-            grid-template-columns: repeat(5, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: .75rem;
             align-items: stretch;
             margin: .15rem 0 1rem 0;
@@ -461,10 +564,13 @@ def inject_css() -> None:
             margin-bottom: .35rem;
         }
         @media (max-width: 980px) {
-            .qse-method, .qse-readiness, .qse-explain, .qse-metric-grid, .qse-detector-grid, .qse-month-metrics {
+            .qse-review-grid, .qse-method, .qse-readiness, .qse-explain, .qse-metric-grid, .qse-detector-grid, .qse-month-metrics {
                 grid-template-columns: 1fr;
             }
             .qse-final-verdict dl {
+                grid-template-columns: 1fr;
+            }
+            .qse-primary-insight dl {
                 grid-template-columns: 1fr;
             }
         }
@@ -504,6 +610,19 @@ def metric_grid(cards: list[tuple[str, str, str]]) -> None:
         )
     chunks.append("</div>")
     st.markdown("".join(chunks), unsafe_allow_html=True)
+
+
+def section_heading(eyebrow: str, title: str, body: str) -> None:
+    st.markdown(
+        f"""
+        <div class="qse-section-title">
+          <div class="eyebrow">{html.escape(eyebrow)}</div>
+          <h2>{html.escape(title)}</h2>
+          <p>{html.escape(body)}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def detector_story_panel() -> None:
@@ -702,6 +821,74 @@ def ok_months(frame: pd.DataFrame) -> set[str]:
     return set(frame["month"].dropna().astype(str))
 
 
+def coverage_month_sets(bundle: dict[str, Any]) -> dict[str, set[str]]:
+    timeline_months = ok_months(bundle["timeline"])
+    return {
+        "GRACE": timeline_months,
+        "USDM": timeline_months,
+        "GLDAS": ok_months(bundle["gldas_metrics"]),
+        "TWS": ok_months(bundle["tws_metrics"]),
+        "Basin": ok_months(bundle["basin_metrics"]),
+        "Groundwater": ok_months(bundle["groundwater_monthly"]),
+    }
+
+
+def coverage_timeline_figure(bundle: dict[str, Any], height: int = 270) -> Any | None:
+    if go is None:
+        return None
+    month_sets = coverage_month_sets(bundle)
+    months = sorted(set().union(*month_sets.values())) if month_sets else []
+    if not months:
+        return None
+    targets = list(month_sets.keys())
+    z = [[1 if month in month_sets[target] else 0 for month in months] for target in targets]
+    text = [
+        [f"{target}<br>{month}<br>{'available' if value else 'missing'}" for month, value in zip(months, row)]
+        for target, row in zip(targets, z)
+    ]
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=z,
+            x=months,
+            y=targets,
+            text=text,
+            hovertemplate="%{text}<extra></extra>",
+            colorscale=[[0, "#f4c95d"], [0.499, "#f4c95d"], [0.5, GREEN], [1, GREEN]],
+            showscale=False,
+            xgap=2,
+            ygap=2,
+        )
+    )
+    fig.update_layout(
+        title="Month Coverage By Evidence Target",
+        template="plotly_white",
+        height=height,
+        margin=dict(l=8, r=8, t=42, b=8),
+        xaxis_title="Month",
+        yaxis_title="",
+    )
+    fig.update_xaxes(tickangle=0)
+    fig.add_annotation(
+        text="Green = available, amber = missing",
+        xref="paper",
+        yref="paper",
+        x=1,
+        y=1.17,
+        showarrow=False,
+        xanchor="right",
+        font=dict(size=12, color=MUTED),
+    )
+    return fig
+
+
+def coverage_label(bundle: dict[str, Any], target: str) -> str:
+    month_sets = coverage_month_sets(bundle)
+    detection_months = month_sets.get("GRACE", set())
+    target_months = month_sets.get(target, set())
+    denominator = len(detection_months) or len(target_months)
+    return f"{len(target_months)}/{denominator}" if denominator else "n/a"
+
+
 def coverage_warning(bundle: dict[str, Any]) -> None:
     timeline = bundle["timeline"]
     detection_months = ok_months(timeline)
@@ -751,7 +938,11 @@ def coverage_overview(bundle: dict[str, Any]) -> None:
     if alignment.empty and not summary:
         return
     st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
-    st.subheader("Month Coverage")
+    section_heading(
+        "Data hierarchy",
+        "Month Coverage",
+        "Coverage appears before performance metrics so reviewers can see which evidence targets align and which are partial.",
+    )
     targets = summary.get("targets", {}) if summary else {}
     cards = []
     for target in ["grace", "usdm", "gldas", "tws", "basin", "groundwater"]:
@@ -840,6 +1031,7 @@ def readiness_ladder(gldas_summary: dict[str, Any], groundwater_summary: dict[st
 
 
 def validation_status(
+    bundle: dict[str, Any],
     timeline: pd.DataFrame,
     filtered: pd.DataFrame,
     gldas_summary: dict[str, Any],
@@ -860,36 +1052,76 @@ def validation_status(
         weak_text = f"{weak['month']} D{weak['threshold']}+, F1 {fmt(weak['f1'])}"
     strongest_basin, weakest_basin = basin_callouts(basin_summary_table, groundwater_summary_table)
 
+    section_heading(
+        "Golden zone",
+        "Validation Status",
+        "The top row separates the project’s strongest defensible claim from supporting evidence and claim limits.",
+    )
+    left, middle, right = st.columns([1.05, 1.45, .9])
+    with left:
+        st.markdown(
+            f"""
+            <div class="qse-primary-insight">
+              <div class="qse-kicker">Current scientific claim</div>
+              <h2>{html.escape(level)}: {html.escape(level_note)}</h2>
+              <p>
+                This run supports reproducible hydrology workflow validation. It should be reviewed as
+                evidence alignment, not as field proof of groundwater discovery or quantum advantage.
+              </p>
+              <dl>
+                <dt>Months</dt><dd>{html.escape(str(months))}</dd>
+                <dt>Targets</dt><dd>{html.escape(target_types(gldas_summary, tws_summary, groundwater_summary))}</dd>
+                <dt>Best detector</dt><dd>{html.escape(best_text)}</dd>
+                <dt>Weak point</dt><dd>{html.escape(weak_text)}</dd>
+              </dl>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with middle:
+        fig = coverage_timeline_figure(bundle)
+        if fig is not None:
+            st.plotly_chart(fig, width="stretch")
+        else:
+            verdict("Coverage unavailable", "No month-level coverage artifacts are available for this output.", warning=True)
+    with right:
+        st.markdown(
+            f"""
+            <div class="qse-side-panel">
+              <span class="qse-claim-pill">Claim boundary</span>
+              <h3>What a reviewer should take away</h3>
+              <ul>
+                <li><strong>Workflow validation:</strong> yes, when artifacts and tests are present.</li>
+                <li><strong>Hydrology comparison:</strong> {html.escape('yes' if gldas_summary.get('status') == 'ok' else 'partial or missing')}.</li>
+                <li><strong>Groundwater validation:</strong> {html.escape('begun' if groundwater_ready(groundwater_summary) else 'not yet strong')}.</li>
+                <li><strong>Groundwater discovery:</strong> not proven.</li>
+                <li><strong>Quantum advantage:</strong> not claimed.</li>
+              </ul>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     metric_grid(
         [
-            ("Validation status", level, level_note),
-            ("Months tested", str(months), "GRACE/USDM monthly folds"),
-            ("Targets", target_types(gldas_summary, tws_summary, groundwater_summary), "Mask, hydrology, and well evidence"),
-            ("Strongest basin", strongest_basin, "Groundwater first, GLDAS fallback"),
-            ("Weakest basin", weakest_basin, "Groundwater first, GLDAS fallback"),
-            ("Strongest result", best_text, "Best visible detector row"),
-            ("Weakest point", weak_text, "Low-performing z-score month"),
+            ("GRACE/USDM", coverage_label(bundle, "GRACE"), "detector months"),
+            ("GLDAS", coverage_label(bundle, "GLDAS"), "external hydrology"),
+            ("TWS", coverage_label(bundle, "TWS"), "processing-center comparison"),
+            ("Groundwater", coverage_label(bundle, "Groundwater"), "well/basin months"),
+            ("Strongest basin", strongest_basin, "groundwater first, GLDAS fallback"),
+            ("Weakest basin", weakest_basin, "groundwater first, GLDAS fallback"),
         ]
     )
-
-    left, right = st.columns([1.25, 1])
-    with left:
-        verdict(
-            "Current conclusion",
-            "The project now demonstrates a reproducible validation workflow on real GRACE-derived rasters with independent drought labels and an external hydrology target. The detector agreement is modest, but the data pipeline is inspectable and repeatable.",
-        )
-    with right:
-        verdict(
-            "Boundary of the claim",
-            "Groundwater discovery is not proven and quantum advantage is not claimed. Even with DWR/USGS wells present, the evidence is basin-scale validation unless sensor sensitivity and field confirmation support stronger claims.",
-            warning=True,
-        )
     readiness_ladder(gldas_summary, groundwater_summary)
 
 
 def evidence_trail() -> None:
     st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
-    st.subheader("Evidence Trail")
+    section_heading(
+        "Method context",
+        "Evidence Trail",
+        "A compact workflow from satellite water-mass rasters to proxy masks, detectors, hydrology checks, and groundwater evidence.",
+    )
     st.markdown(
         """
         <div class="qse-method">
@@ -925,7 +1157,11 @@ def selected_month_row(df: pd.DataFrame, controls: dict[str, Any]) -> pd.Series 
 
 def study_region(output_dir: Path, timeline: pd.DataFrame, controls: dict[str, Any]) -> None:
     st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
-    st.subheader("Study Region")
+    section_heading(
+        "Geospatial context",
+        "Study Region",
+        "The map shows where the validation happens, which cells are GRACE/GRACE-FO values, and where the independent USDM mask is active.",
+    )
     row = selected_month_row(timeline, controls)
     if row is None:
         st.info("No timeline rows are available for the study-region map.")
@@ -965,8 +1201,13 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
         st.info(grid.get("error") or mask.get("error"))
         return None
 
-    array = grid["array"]
+    array = np.asarray(grid["array"], dtype=float)
+    array = np.where(np.abs(array) > 10000, np.nan, array)
     mask_array = np.where(mask["array"] > 0, 1.0, np.nan)
+    finite = array[np.isfinite(array)]
+    z_limit = float(np.nanpercentile(np.abs(finite), 98)) if finite.size else 1.0
+    if not np.isfinite(z_limit) or z_limit <= 0:
+        z_limit = 1.0
     left, bottom, right, top = grid["bounds"]
     x = np.linspace(left, right, array.shape[1])
     y = np.linspace(top, bottom, array.shape[0])
@@ -977,9 +1218,11 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
             z=array,
             x=x,
             y=y,
-            colorscale="RdBu",
+            colorscale=WATER_DIVERGING,
+            zmin=-z_limit,
+            zmax=z_limit,
             zmid=0,
-            colorbar=dict(title="cm EWT"),
+            colorbar=dict(title="GRACE anomaly<br>cm EWT", ticksuffix=" cm"),
             hovertemplate="lon=%{x:.2f}<br>lat=%{y:.2f}<br>GRACE=%{z:.3f} cm<extra></extra>",
             name="GRACE anomaly",
         )
@@ -1017,8 +1260,17 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
         fig.add_shape(type="line", x0=xi, x1=xi, y0=bottom, y1=top, line=dict(color="rgba(20,33,47,.13)", width=1))
     for yi in y:
         fig.add_shape(type="line", x0=left, x1=right, y0=yi, y1=yi, line=dict(color="rgba(20,33,47,.13)", width=1))
+    fig.add_shape(
+        type="rect",
+        x0=left,
+        x1=right,
+        y0=bottom,
+        y1=top,
+        line=dict(color=INK, width=1.2),
+        fillcolor="rgba(0,0,0,0)",
+    )
     fig.update_layout(
-        title=f"{month} Western U.S. GRACE Crop With USDM D{threshold}+ Mask",
+        title=f"{month} GRACE/GRACE-FO Water-Mass Anomaly With USDM D{threshold}+ Overlay",
         template="plotly_white",
         height=520,
         margin=dict(l=10, r=10, t=55, b=10),
@@ -1045,7 +1297,7 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
         align="left",
     )
     fig.add_annotation(
-        text="Western U.S. validation crop",
+        text="Validation crop",
         x=(left + right) / 2,
         y=top - 1,
         showarrow=False,
@@ -1065,6 +1317,24 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
         borderpad=4,
         align="left",
     )
+    region_labels = [
+        ("California", -119.6, 37.2),
+        ("Central Valley", -120.5, 36.4),
+        ("Great Basin", -116.3, 40.2),
+        ("Rockies", -108.2, 43.0),
+        ("Pacific coast", -123.9, 43.5),
+    ]
+    for label, lon, lat in region_labels:
+        if left <= lon <= right and bottom <= lat <= top:
+            fig.add_annotation(
+                text=label,
+                x=lon,
+                y=lat,
+                showarrow=False,
+                font=dict(size=11, color="#273849"),
+                bgcolor="rgba(255,255,255,.58)",
+                borderpad=2,
+            )
     return fig
 
 
@@ -1076,11 +1346,7 @@ def detection_chart(df: pd.DataFrame, metric: str) -> Any | None:
     chart_df["Sensor"] = chart_df["sensor_profile"].map(labelize)
     chart_df["USDM"] = "D" + chart_df["threshold"].astype(str) + "+"
     chart_df["Series"] = chart_df["USDM"] + " | " + chart_df["Sensor"] + " | " + chart_df["Detector"]
-    colors = {
-        "Z Score": BLUE,
-        "Dbscan": AMBER,
-        "Isolation Forest": GREEN,
-    }
+    y_label = f"{labelize(metric)} (unitless rate)" if metric in {"f1", "iou", "false_positive_rate", "false_negative_rate"} else labelize(metric)
     fig = px.line(
         chart_df,
         x="month",
@@ -1089,18 +1355,33 @@ def detection_chart(df: pd.DataFrame, metric: str) -> Any | None:
         line_dash="USDM",
         facet_row="Sensor",
         markers=True,
-        color_discrete_map=colors,
-        labels={"month": "Month", metric: labelize(metric)},
+        color_discrete_map=DETECTOR_COLORS,
+        labels={"month": "Month", metric: y_label},
         template="plotly_white",
     )
     fig.update_layout(height=540, margin=dict(l=10, r=10, t=35, b=10), legend_title_text="Detector")
-    fig.update_yaxes(rangemode="tozero")
+    if metric in {"f1", "iou", "false_positive_rate", "false_negative_rate"}:
+        fig.update_yaxes(range=[0, 1])
+        reference = 0.5 if metric in {"f1", "iou"} else 0.1
+        fig.add_hline(
+            y=reference,
+            line_dash="dash",
+            line_color=AMBER,
+            annotation_text="review reference" if metric in {"f1", "iou"} else "FPR caution",
+            annotation_position="top left",
+        )
+    else:
+        fig.update_yaxes(rangemode="tozero")
     return fig
 
 
 def detection_results(output_dir: Path, filtered: pd.DataFrame, controls: dict[str, Any]) -> None:
     st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
-    st.subheader("Detection Results")
+    section_heading(
+        "Detector layer",
+        "Detection Results",
+        "Detector performance is secondary evidence: useful for comparison, but not the core scientific claim.",
+    )
     detector_story_panel()
     metric = controls.get("metric", "f1")
     fig = detection_chart(filtered, metric)
@@ -1252,10 +1533,19 @@ def outcome_artifacts(output_dir: Path, filtered: pd.DataFrame) -> None:
                     st.info(f"Missing {label}: {path.name}")
 
 
-def hydrology_chart(metrics: pd.DataFrame, title: str, target_label: str) -> Any | None:
+def hydrology_chart(metrics: pd.DataFrame, title: str, target_label: str, mode: str) -> Any | None:
     if px is None or metrics.empty:
         return None
-    keep = [col for col in ["correlation", "anomaly_sign_agreement", "rmse_cm", "bias_cm"] if col in metrics.columns]
+    if mode == "error":
+        keep = [col for col in ["rmse_cm", "bias_cm"] if col in metrics.columns]
+        y_label = "Error / bias (cm EWT)"
+        colors = [AMBER, RED]
+    else:
+        keep = [col for col in ["correlation", "anomaly_sign_agreement", "trend_agreement"] if col in metrics.columns]
+        y_label = "Agreement metric (unitless)"
+        colors = [BLUE, GREEN, AMBER]
+    if not keep:
+        return None
     long_df = metrics.melt(id_vars=["month"], value_vars=keep, var_name="metric", value_name="value")
     long_df["metric"] = long_df["metric"].map(labelize)
     fig = px.line(
@@ -1265,10 +1555,15 @@ def hydrology_chart(metrics: pd.DataFrame, title: str, target_label: str) -> Any
         color="metric",
         markers=True,
         template="plotly_white",
-        color_discrete_sequence=[BLUE, GREEN, AMBER, RED],
-        labels={"month": "Month", "value": "Metric value", "metric": target_label},
+        color_discrete_sequence=colors,
+        labels={"month": "Month", "value": y_label, "metric": target_label},
     )
     fig.update_layout(title=title, height=410, margin=dict(l=10, r=10, t=50, b=10), legend_title_text="")
+    if mode == "error":
+        fig.add_hline(y=0, line_dash="dash", line_color=MUTED, annotation_text="zero bias", annotation_position="bottom right")
+    else:
+        fig.update_yaxes(range=[-1, 1])
+        fig.add_hline(y=0, line_dash="dash", line_color=MUTED, annotation_text="no relationship", annotation_position="bottom right")
     return fig
 
 
@@ -1343,12 +1638,13 @@ def basin_time_series(metrics: pd.DataFrame) -> Any | None:
         x="month",
         y="value",
         color="basin_name",
-        line_dash="metric",
+        facet_row="metric",
         markers=True,
         template="plotly_white",
-        labels={"month": "Month", "value": "Value", "basin_name": "Basin"},
+        labels={"month": "Month", "value": "Value (cm EWT or % coverage)", "basin_name": "Basin"},
     )
     fig.update_layout(height=520, margin=dict(l=10, r=10, t=25, b=10), legend_title_text="")
+    fig.update_yaxes(matches=None)
     return fig
 
 
@@ -1357,7 +1653,11 @@ def basin_validation(output_dir: Path, bundle: dict[str, Any]) -> None:
     summary_table = bundle["basin_summary_table"]
     summary = bundle["basin_summary"]
     st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
-    st.subheader("Basin Validation")
+    section_heading(
+        "Basin scale",
+        "Basin Validation",
+        "Basin aggregation is the more defensible scale for coarse GRACE/GRACE-FO water-mass signals.",
+    )
     if metrics.empty or summary_table.empty:
         st.info("No basin metrics found yet. Rerun the multimonth workflow to generate basin_metrics.csv and basin_summary.csv.")
         return
@@ -1434,17 +1734,19 @@ def groundwater_time_series(metrics: pd.DataFrame, monthly: pd.DataFrame, basin_
         x="month",
         y="value",
         color="metric",
+        facet_row="metric",
         markers=True,
         template="plotly_white",
         color_discrete_sequence=[GREEN, BLUE],
-        labels={"month": "Month", "value": "Groundwater value", "metric": ""},
+        labels={"month": "Month", "value": "Groundwater value / anomaly", "metric": ""},
     )
     fig.update_layout(
         title=f"Groundwater observation track for basin {basin_id}" + (f" | D{threshold}+" if threshold else ""),
-        height=410,
+        height=470,
         margin=dict(l=10, r=10, t=50, b=10),
         legend_title_text="",
     )
+    fig.update_yaxes(matches=None)
     return fig
 
 
@@ -1487,7 +1789,11 @@ def groundwater_validation(output_dir: Path, bundle: dict[str, Any]) -> None:
     metrics = bundle["groundwater_metrics"]
     summary_table = bundle["groundwater_summary_table"]
     st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
-    st.subheader("Groundwater Validation")
+    section_heading(
+        "Primary release target",
+        "Groundwater Validation",
+        "This section appears only when DWR/USGS well observations have been normalized and joined to basins.",
+    )
     if not summary or summary.get("status") == "not_configured":
         st.info("No groundwater observation track is configured for this run. Add DWR Periodic Groundwater Level Measurements or USGS groundwater observations to begin basin-scale groundwater validation.")
         return
@@ -1575,7 +1881,11 @@ def hydrology_targets(
     tws_summary: dict[str, Any],
 ) -> None:
     st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
-    st.subheader("Hydrology Target")
+    section_heading(
+        "External target",
+        "Hydrology Target",
+        "GLDAS/TWS metrics test water-storage agreement with units and error separated from unitless correlations.",
+    )
     metric_grid(
         [
             ("GLDAS corr.", fmt(gldas_summary.get("mean_correlation")), "External TWS target"),
@@ -1588,11 +1898,21 @@ def hydrology_targets(
 
     left, right = st.columns(2)
     with left:
-        fig = hydrology_chart(gldas_metrics, "GRACE vs GLDAS Hydrology Agreement", "GLDAS")
+        fig = hydrology_chart(gldas_metrics, "GRACE vs GLDAS Agreement", "GLDAS", "agreement")
         if fig is not None:
             st.plotly_chart(fig, width="stretch")
     with right:
-        fig = hydrology_chart(tws_metrics, "CSR vs JPL GRACE TWS Agreement", "TWS")
+        fig = hydrology_chart(tws_metrics, "CSR vs JPL TWS Agreement", "TWS", "agreement")
+        if fig is not None:
+            st.plotly_chart(fig, width="stretch")
+
+    left, right = st.columns(2)
+    with left:
+        fig = hydrology_chart(gldas_metrics, "GRACE vs GLDAS Error", "GLDAS", "error")
+        if fig is not None:
+            st.plotly_chart(fig, width="stretch")
+    with right:
+        fig = hydrology_chart(tws_metrics, "CSR vs JPL TWS Error", "TWS", "error")
         if fig is not None:
             st.plotly_chart(fig, width="stretch")
 
@@ -1620,7 +1940,11 @@ def hydrology_targets(
 
 def limits_and_next_step(output_dir: Path, bundle: dict[str, Any]) -> None:
     st.markdown("<div class='qse-section'></div>", unsafe_allow_html=True)
-    st.subheader("Limits and Next Step")
+    section_heading(
+        "Reviewer verdict",
+        "Limits and Next Step",
+        "The dashboard ends by drawing the scientific claim boundary and naming the dataset needed next.",
+    )
     st.markdown(
         """
         <div class="qse-final-verdict">
@@ -1698,6 +2022,7 @@ def main() -> None:
     stale_data_warning(timeline)
     coverage_warning(bundle)
     validation_status(
+        bundle,
         timeline,
         filtered,
         bundle["gldas_summary"],
