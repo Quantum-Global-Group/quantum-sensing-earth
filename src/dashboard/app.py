@@ -1202,9 +1202,13 @@ def study_region(output_dir: Path, timeline: pd.DataFrame, controls: dict[str, A
 
     grid_path = resolve_artifact(row["grid_path"], output_dir)
     mask_path = resolve_artifact(row["mask_path"], output_dir)
+    basin_summary = maybe_json(output_dir / "basin_summary.json")
+    basin_path = basin_summary.get("basin_fixture")
+    if basin_path:
+        basin_path = resolve_artifact(basin_path, output_dir)
     left, right = st.columns([1.45, .55])
     with left:
-        fig = make_region_figure(grid_path, mask_path, str(row["month"]), int(row["threshold"]))
+        fig = make_region_figure(grid_path, mask_path, str(row["month"]), int(row["threshold"]), basin_path)
         if fig is not None:
             st.plotly_chart(fig, width="stretch")
         else:
@@ -1217,6 +1221,14 @@ def study_region(output_dir: Path, timeline: pd.DataFrame, controls: dict[str, A
         html_card("Selected month", str(row["month"]), f"USDM D{row['threshold']}+ mask")
         html_card("Grid artifact", grid_path.name, "GRACE raster")
         html_card("Mask artifact", mask_path.name, "USDM proxy label")
+        html_card("Basin layer", basin_path.name if basin_path else "not found", "DWR B118 boundaries")
+        grid_meta = read_raster(str(grid_path)) if grid_path.exists() else {}
+        if not grid_meta.get("error"):
+            html_card(
+                "Grid metadata",
+                f"{grid_meta.get('shape', ['?', '?'])[0]} x {grid_meta.get('shape', ['?', '?'])[1]} cells",
+                f"CRS {grid_meta.get('crs', 'unknown')} | {fmt(grid_meta.get('resolution', [np.nan, np.nan])[0])} degree",
+            )
     explainer(
         "The geographic crop, GRACE cell footprint, and drought-mask overlay used for validation.",
         "A clear spatial overlap between the raster, mask, and study area, with CRS/resolution preserved.",
@@ -1225,7 +1237,13 @@ def study_region(output_dir: Path, timeline: pd.DataFrame, controls: dict[str, A
     )
 
 
-def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: int) -> Any | None:
+def make_region_figure(
+    grid_path: Path,
+    mask_path: Path,
+    month: str,
+    threshold: int,
+    basin_path: Path | None = None,
+) -> Any | None:
     if go is None or not grid_path.exists() or not mask_path.exists():
         return None
     grid = read_raster(str(grid_path))
@@ -1242,8 +1260,12 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
     if not np.isfinite(z_limit) or z_limit <= 0:
         z_limit = 1.0
     left, bottom, right, top = grid["bounds"]
-    x = np.linspace(left, right, array.shape[1])
-    y = np.linspace(top, bottom, array.shape[0])
+    x_res = float(grid["resolution"][0]) if grid.get("resolution") else (right - left) / max(array.shape[1], 1)
+    y_res = abs(float(grid["resolution"][1])) if grid.get("resolution") else (top - bottom) / max(array.shape[0], 1)
+    x = np.linspace(left + x_res / 2, right - x_res / 2, array.shape[1])
+    y = np.linspace(top - y_res / 2, bottom + y_res / 2, array.shape[0])
+    x_edges = np.linspace(left, right, array.shape[1] + 1)
+    y_edges = np.linspace(bottom, top, array.shape[0] + 1)
 
     fig = go.Figure()
     fig.add_trace(
@@ -1271,6 +1293,39 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
             name=f"USDM D{threshold}+ mask",
         )
     )
+    if basin_path and basin_path.exists():
+        try:
+            basin_payload = read_json(str(basin_path))
+        except Exception:
+            basin_payload = {}
+        for feature in basin_payload.get("features", []):
+            props = feature.get("properties", {})
+            basin_name = props.get("basin_name") or props.get("name") or "DWR basin"
+            for ring in geometry_rings(feature.get("geometry", {})):
+                xs = [point[0] for point in ring]
+                ys = [point[1] for point in ring]
+                if not xs or max(xs) < left or min(xs) > right or max(ys) < bottom or min(ys) > top:
+                    continue
+                fig.add_trace(
+                    go.Scatter(
+                        x=xs,
+                        y=ys,
+                        mode="lines",
+                        line=dict(color="rgba(20,33,47,.82)", width=1.35),
+                        name="DWR B118 basin boundary",
+                        showlegend=False,
+                        hovertemplate=f"{html.escape(str(basin_name))}<br>DWR Bulletin 118 basin/subbasin<extra></extra>",
+                    )
+                )
+        fig.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="lines",
+                line=dict(color="rgba(20,33,47,.82)", width=1.35),
+                name="DWR B118 basin boundary",
+            )
+        )
     fig.add_trace(
         go.Scatter(
             x=[None],
@@ -1289,10 +1344,10 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
             name="GRACE cm EWT anomaly",
         )
     )
-    for xi in x:
-        fig.add_shape(type="line", x0=xi, x1=xi, y0=bottom, y1=top, line=dict(color="rgba(20,33,47,.13)", width=1))
-    for yi in y:
-        fig.add_shape(type="line", x0=left, x1=right, y0=yi, y1=yi, line=dict(color="rgba(20,33,47,.13)", width=1))
+    for xi in x_edges:
+        fig.add_shape(type="line", x0=xi, x1=xi, y0=bottom, y1=top, line=dict(color="rgba(20,33,47,.10)", width=1))
+    for yi in y_edges:
+        fig.add_shape(type="line", x0=left, x1=right, y0=yi, y1=yi, line=dict(color="rgba(20,33,47,.10)", width=1))
     fig.add_shape(
         type="rect",
         x0=left,
@@ -1303,36 +1358,45 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
         fillcolor="rgba(0,0,0,0)",
     )
     fig.update_layout(
-        title=f"{month} GRACE/GRACE-FO Water-Mass Anomaly With USDM D{threshold}+ Overlay",
+        title_text=f"{month} Central Valley GRACE/GRACE-FO Water-Mass Anomaly With USDM D{threshold}+ Overlay",
         template="plotly_white",
-        height=520,
-        margin=dict(l=10, r=10, t=55, b=10),
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#f7fafc",
+        font=dict(color=INK, family="Open Sans, Arial, sans-serif"),
+        title=dict(
+            font=dict(color=INK, size=17),
+            x=0,
+            xanchor="left",
+        ),
+        height=560,
+        margin=dict(l=10, r=10, t=82, b=10),
         xaxis_title="Longitude",
         yaxis_title="Latitude",
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.01,
-            xanchor="right",
-            x=1,
+            y=1.035,
+            xanchor="left",
+            x=0,
             bgcolor="rgba(255,255,255,.85)",
+            font=dict(size=11, color=INK),
         ),
     )
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
-    fig.add_annotation(
-        text=f"CRS {grid['crs']} | resolution {fmt(grid['resolution'][0])} x {fmt(abs(grid['resolution'][1]))}",
-        xref="paper",
-        yref="paper",
-        x=0,
-        y=1.08,
-        showarrow=False,
-        font=dict(size=12, color=MUTED),
-        align="left",
+    fig.update_xaxes(
+        range=[left - 0.35, right + 0.35],
+        showgrid=False,
+        zeroline=False,
+    )
+    fig.update_yaxes(
+        range=[bottom - 0.35, top + 0.35],
+        showgrid=False,
+        zeroline=False,
     )
     fig.add_annotation(
-        text="Validation crop",
+        text="Central Valley validation crop",
         x=(left + right) / 2,
-        y=top - 1,
+        y=top - 0.35,
         showarrow=False,
         font=dict(size=13, color=INK),
         bgcolor="rgba(255,255,255,.72)",
@@ -1340,9 +1404,9 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
         borderpad=4,
     )
     fig.add_annotation(
-        text="Red cells: independent USDM drought proxy",
-        x=left + 1.1,
-        y=bottom + 1.1,
+        text="Red overlay: independent USDM drought proxy",
+        x=left + 0.22,
+        y=bottom + 0.28,
         showarrow=False,
         font=dict(size=12, color=RED),
         bgcolor="rgba(255,255,255,.78)",
@@ -1351,11 +1415,10 @@ def make_region_figure(grid_path: Path, mask_path: Path, month: str, threshold: 
         align="left",
     )
     region_labels = [
-        ("California", -119.6, 37.2),
-        ("Central Valley", -120.5, 36.4),
-        ("Great Basin", -116.3, 40.2),
-        ("Rockies", -108.2, 43.0),
-        ("Pacific coast", -123.9, 43.5),
+        ("Sacramento Valley", -121.7, 39.4),
+        ("San Joaquin Valley", -120.3, 36.9),
+        ("Coast Ranges", -122.7, 37.2),
+        ("Sierra Nevada", -119.35, 38.6),
     ]
     for label, lon, lat in region_labels:
         if left <= lon <= right and bottom <= lat <= top:
