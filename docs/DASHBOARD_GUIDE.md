@@ -48,9 +48,12 @@ python -m streamlit run src/dashboard/app.py -- --output outputs/grace_multimont
 
 - Use the coverage heatmap to check whether target evidence is complete before reading performance metrics.
 - Use the study-region raster map to inspect GRACE values, USDM mask overlay, CRS, bounds, and grid resolution.
-- Use the basin map color control to switch between correlation, lagged correlation, trend agreement, drought coverage, or other basin-review metrics.
+- Use the study-region basin color control to switch the California map between GRACE, GLDAS, USDM, and groundwater values for the selected month.
+- Hover over colored basins to see the current basin data point, including GRACE mean, GLDAS mean, USDM coverage, groundwater anomaly, observation count, and site count.
+- Use the basin map color control in Basin Validation to switch between correlation, lagged correlation, trend agreement, drought coverage, or other basin-review metrics.
 - Use the GRACE-vs-groundwater scatter plot to inspect whether selected basin months move together; bubble size shows observation count.
-- Use the detector tradeoff plot to see whether a detector's F1 score comes with an unacceptable false-positive rate.
+- Use the detector performance matrix to compare F1, IoU, false-positive rate, false-negative rate, and month count by sensor, detector, and drought threshold.
+- Use the groundwater basin ranking chart instead of raw all-basin bars when comparing basin-level correlation, lagged correlation, trend agreement, or sign agreement.
 - Use table sorting and sidebar filters to narrow evidence by threshold, detector, sensor profile, month, and basin.
 
 ## Reviewer Rules
